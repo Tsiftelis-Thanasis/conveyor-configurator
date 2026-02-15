@@ -12,19 +12,22 @@ Primary use cases: manufacturing equipment configuration, quote generation, and 
 ## Tech Stack
 
 ### Frontend
-- HTML5 with ES Modules
+- **Blazor WebAssembly** (.NET 9) - Component-based UI framework
+- **Razor Components** - Reusable UI components
 - CSS3 (CSS variables for dark theme)
-- Vanilla JavaScript (ES6+)
-- **Three.js v0.160.0** - 3D rendering
+- **Three.js v0.160.0** - 3D rendering via JavaScript interop
+- ES6+ JavaScript modules for Three.js integration
 
 ### Backend
 - **.NET 10** - Minimal APIs with ASP.NET Core
 - C# with record types and nullable reference types
-- **Ab4d.OpenCascade** - Server-side STEP/IGES CAD parsing
-- Static file serving (frontend hosted by .NET)
+- **ACadSharp** - DWG/DXF CAD file parsing
+- **Entity Framework Core** - SQLite database for product catalog
+- RESTful API endpoints
 
 ### Development
 - Windows batch scripts for local development
+- Separate backend (port 5000) and frontend (port 5050) servers
 
 ### File Formats
 - STEP (ISO 10303-21) for CAD import/export
@@ -35,146 +38,234 @@ Primary use cases: manufacturing equipment configuration, quote generation, and 
 ## Architecture
 
 ```
-.NET 10 Server (Port 5000)
-├── Static Files (wwwroot/)
-│   ├── index.html
-│   ├── app.js
-│   └── styles.css
+Backend (.NET 10) - Port 5000
 ├── API Endpoints
 │   ├── GET  /api/health
-│   ├── POST /api/export/step          (roller)
-│   ├── POST /api/export/overhead-step (overhead)
-│   ├── POST /api/import/cad           (STEP/IGES parsing)
+│   ├── GET  /api/clients/* (product catalog)
+│   ├── POST /api/export/overhead-step
+│   ├── POST /api/import/cad (DWG/DXF parsing)
 │   └── POST /api/quotes
-└── Ab4d.OpenCascade (CAD processing)
+├── Services
+│   └── CadImportService (ACadSharp)
+├── Data
+│   ├── ProductDbContext (EF Core)
+│   └── SQLite database (niko-products.db)
+└── Models (DTOs, entities)
 
-Browser
-├── Three.js 3D Scene
-├── Controls Panel (sliders, inputs)
-├── Real-time model rendering
-└── REST API calls to same origin
+Frontend (Blazor WASM) - Port 5050
+├── Pages
+│   └── Home.razor (main configurator)
+├── Shared Components
+│   ├── OverheadControls.razor
+│   ├── BomPanel.razor
+│   ├── QuoteModal.razor
+│   ├── CadImportModal.razor
+│   └── CadPreview2D.razor
+├── Services
+│   ├── ConveyorApiService (HTTP client)
+│   └── ThreeJsInterop (JS interop)
+├── Models (DTOs)
+└── wwwroot
+    ├── js/ (Three.js integration)
+    └── css/ (dark theme styles)
 ```
 
 ### Data Flow
-1. User adjusts controls → config objects update
-2. Config change triggers `buildConveyor()` → 3D model rebuilds
-3. Export STEP → config sent to backend → file generated
-4. Import CAD → file sent to backend → Ab4d.OpenCascade parses → mesh data returned → Three.js renders
-5. Request Quote → form + config → saved as JSON
+1. User adjusts controls → OverheadConfig object updates
+2. Config change triggers OnConfigChanged → ThreeJsInterop.BuildOverheadConveyorAsync()
+3. Three.js rebuilds 3D model in viewport
+4. Generate BOM → Fetches parts from product catalog API → Calculates quantities
+5. Export STEP → config sent to backend → STEP file generated → downloaded
+6. Import CAD → DWG/DXF uploaded → ACadSharp parses → 2D preview + 3D mesh → config auto-populated
+7. Request Quote → form + config + BOM → saved to backend/quotes/
 
-### Type Switching
-- `activeType` variable tracks current mode ('roller' | 'overhead')
-- CSS classes `mode-roller` / `mode-overhead` on body
-- Elements use `.roller-only` / `.overhead-only` for visibility
+### Component Communication
+- Blazor components use EventCallback for parent-child communication
+- Services injected via DI (@inject ConveyorApiService, @inject ThreeJsInterop)
+- JavaScript interop via IJSRuntime for Three.js integration
+- HTTP calls to backend API via HttpClient
 
 ## File Organization
 
 ```
 conveyor-configurator/
 ├── backend/
-│   ├── wwwroot/            # Static frontend files
-│   │   ├── index.html      # Main HTML with controls panel and canvas
-│   │   ├── app.js          # Core application logic (~1150 lines)
-│   │   └── styles.css      # Dark theme styling, controls, modals
-│   ├── Program.cs          # .NET Minimal API endpoints + static file serving
-│   ├── ConveyorApi.csproj  # .NET 10 project file with Ab4d.OpenCascade
-│   ├── bin/                # Compiled output
-│   └── obj/                # Build artifacts
-├── sample-configs.csv          # Roller conveyor examples
-├── sample-overhead-configs.csv # Overhead conveyor examples
-├── start.bat               # Launches .NET server
+│   ├── Data/               # Database context and entities
+│   ├── Models/             # DTOs and data models
+│   ├── Services/           # Business logic (CadImportService)
+│   ├── Program.cs          # .NET Minimal API endpoints
+│   ├── ConveyorApi.csproj  # .NET 10 project file
+│   ├── niko-products.db    # SQLite database
+│   └── quotes/             # Saved quote requests (runtime)
+├── frontend/
+│   ├── Pages/              # Razor pages (Home.razor)
+│   ├── Shared/             # Reusable components
+│   ├── Services/           # API clients and JS interop
+│   ├── Models/             # Frontend DTOs
+│   ├── wwwroot/
+│   │   ├── js/             # Three.js integration
+│   │   └── css/            # Dark theme styles
+│   ├── Program.cs          # Blazor WASM entry point
+│   └── frontend.csproj     # .NET 9 Blazor project
+├── test-track.dxf          # Sample DXF for CAD import testing
+├── sample-configs.csv      # Configuration examples
+├── start.bat               # Launches backend server
+├── start-dev.bat           # Launches both backend and frontend
 └── README.md               # Project documentation
 ```
 
 ## Coding Standards
 
-### JavaScript
-- ES6+ syntax: `const`/`let`, arrow functions, template literals, async/await
-- Event-driven architecture
-- No external dependencies except Three.js
-- `SCALE` constant (0.001) converts millimeters to Three.js units
-- Functions prefixed by purpose: `build*`, `create*`, `generate*`, `parse*`
-- API_URL uses relative path `/api` (same origin)
+### Blazor/Razor
+- Component-based architecture with `.razor` files
+- Parameter passing via `[Parameter]` attributes
+- EventCallback for parent-child communication
+- Code-behind in `@code` blocks
+- Dependency injection via `@inject` directive
+- Lifecycle methods: `OnAfterRenderAsync`, `OnParametersSetAsync`
 
 ### C#
-- Record types for immutable DTOs (`ConveyorConfig`, `OverheadConveyorConfig`, `QuoteRequest`, `MeshDto`)
+- Record types for immutable DTOs
 - Nullable reference types enabled
-- String interpolation for STEP generation
 - Minimal API style with `MapGet()` / `MapPost()`
-- Ab4d.OpenCascade for CAD file parsing
+- Entity Framework Core for database access
+- ACadSharp for DWG/DXF parsing
+- Async/await throughout
+
+### JavaScript (Three.js Integration)
+- ES6 modules for Three.js imports
+- Exported functions for Blazor JSInterop
+- `SCALE` constant (0.001) converts millimeters to Three.js units
+- Functions: `initScene`, `buildOverheadConveyor`, `loadCadMesh`, `setView`
 
 ### CSS
 - CSS custom properties at `:root` for theming
 - Variables: `--bg-dark`, `--bg-panel`, `--accent`, `--highlight`, `--success`
-- BEM-like class naming
-- Visibility classes: `.roller-only`, `.overhead-only`
-
-### HTML
-- Semantic elements: `<aside>`, `<section>`, `<output>`
-- Labels wrap form controls
-- Modal structure with overlay pattern
+- Component-scoped styles where applicable
+- Responsive design with media queries
+- Dark theme throughout
 
 ## Key Patterns
 
-### 3D Model Building
-- Models built into `conveyorGroup` (THREE.Group)
-- Cleared and rebuilt on any config change
+### 3D Model Building (Three.js via JSInterop)
+- Three.js scene managed in `three-scene.js`
+- `conveyorGroup` (THREE.Group) cleared and rebuilt on config changes
 - `THREE.Box3` used for centering calculations
+- Camera auto-fitted to model bounds
 - Shadow casting enabled on all geometry
 
-### Configuration Objects
-```javascript
-// Roller
-config = { length, width, height, rollerDiameter, rollerSpacing, loadCapacity, driveType }
+### Blazor Component Patterns
+```csharp
+// Configuration binding
+[Parameter] public OverheadConveyorConfig Config { get; set; } = new();
+[Parameter] public EventCallback OnConfigChanged { get; set; }
 
-// Overhead
-overheadConfig = { trackLength, trackHeight, carrierSpacing, carrierCount, loadPerCarrier,
-                   trackProfile, includeCurves, curveRadius, inclineAngle, driveUnits }
+// Service injection
+@inject ConveyorApiService Api
+@inject ThreeJsInterop ThreeJs
+@inject IJSRuntime JS
+
+// Async lifecycle
+protected override async Task OnAfterRenderAsync(bool firstRender)
+{
+    if (firstRender)
+    {
+        await ThreeJs.InitializeSceneAsync("three-container");
+        await BuildConveyor();
+    }
+}
 ```
 
-### CAD Import (Server-Side)
-- File uploaded via FormData to `/api/import/cad`
-- Ab4d.OpenCascade parses STEP/IGES on server
-- Returns mesh data (vertices, normals, indices, colors) as JSON
-- Frontend creates Three.js BufferGeometry from mesh data
+### CAD Import Workflow
+1. User uploads DWG/DXF file → `CadImportModal`
+2. Backend parses with ACadSharp → extracts entities
+3. Returns 2D entity data + 3D mesh data
+4. `CadPreview2D` renders 2D canvas
+5. `ThreeJsInterop.LoadCadMeshAsync()` creates 3D mesh
+6. Suggested config auto-populates controls
+
+### BOM Generation
+- Queries product catalog API by series
+- Calculates quantities based on config
+- Selects parts by load capacity and dimensions
+- Supports part swapping with alternatives
 
 ### Error Handling
-- Backend unavailable: falls back to JSON export
-- Try-catch around file operations
-- Status messages auto-clear after 3 seconds
+- Status messages with auto-clear (3 seconds)
+- Try-catch around API calls
+- Null-safe operations with `?.` and `??`
+- Validation on file uploads (type, size)
 
 ## Running the Project
 
 ```batch
-# Start server (Windows)
-start.bat
+# Option 1: Start backend only (serves API)
+cd backend
+dotnet run --urls=http://localhost:5000
 
-# Manual startup
-cd backend && dotnet run --urls=http://localhost:5000
+# Option 2: Start frontend only (separate Blazor WASM dev server)
+cd frontend
+dotnet run --urls=http://localhost:5050
+
+# Option 3: Start both (recommended for development)
+start-dev.bat
+# Then open http://localhost:5050 in your browser
 ```
 
-Open http://localhost:5000 in your browser.
+**Ports:**
+- Backend API: http://localhost:5000
+- Frontend: http://localhost:5050
 
 ## API Endpoints
 
+### Health & Configuration
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/api/health` | Health check |
-| POST | `/api/export/step` | Generate roller STEP file |
+
+### CAD Operations
+| Method | Endpoint | Description |
+|--------|----------|-------------|
 | POST | `/api/export/overhead-step` | Generate overhead STEP file |
-| POST | `/api/import/cad` | Parse STEP/IGES and return mesh data |
+| POST | `/api/import/cad` | Parse DWG/DXF and return mesh data + config |
+
+### Quote Management
+| Method | Endpoint | Description |
+|--------|----------|-------------|
 | POST | `/api/quotes` | Submit quote request |
-| GET | `/api/quotes` | List all quotes (admin) |
+| GET | `/api/quotes` | List all quotes |
+
+### Product Catalog
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/clients` | Get all clients |
+| GET | `/api/clients/{code}` | Get client by code |
+| GET | `/api/clients/{code}/series` | Get profile series for client |
+| GET | `/api/clients/{code}/trolleys` | Get trolleys (filterable by series) |
+| GET | `/api/clients/{code}/bends` | Get track bends (filterable by series/angle) |
+| GET | `/api/clients/{code}/brackets` | Get mounting brackets |
+| GET | `/api/clients/{code}/switches` | Get switches |
+| GET | `/api/clients/{code}/flightbars` | Get flight bars |
+| GET | `/api/clients/{code}/products/search` | Search products (multi-category) |
 
 ## Dependencies
 
-- .NET 10 SDK
-- Ab4d.OpenCascade NuGet package (wraps Open CASCADE Technology for .NET)
+### Backend (.NET 10)
+- ACadSharp - DWG/DXF parsing
+- Microsoft.EntityFrameworkCore.Sqlite - Database
+- Microsoft.EntityFrameworkCore.Design - Migrations
+
+### Frontend (.NET 9 Blazor WASM)
+- Microsoft.AspNetCore.Components.WebAssembly - Blazor framework
+- Three.js v0.160.0 (loaded via CDN)
 
 ## Known Limitations
 
 - STEP export contains parameters in comments only (not full CAD geometry)
-- Track profiles (box, tube) render as I-beam visually
-- Curves approximated with line segments
-- No authentication on API endpoints
-- Quote storage is file-based (production needs database)
+- Track profiles render as I-beam regardless of selected series
+- Curves approximated with line segments in 3D visualization
+- DWG/DXF import supports basic 2D entities only (no 3D solids)
+- No authentication on API endpoints (development mode)
+- Quote storage is file-based in `backend/quotes/` (production needs database)
+- Single conveyor type supported (overhead only)
+- Product catalog limited to NIKO client data
