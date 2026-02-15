@@ -1,0 +1,220 @@
+@using frontend.Models
+
+<section class="control-section">
+    <h3>Track Configuration</h3>
+
+    <div class="control-group">
+        <label>
+            Track Profile
+            <select value="@Config.TrackProfile" @onchange="e => UpdateTrackProfile(e)">
+                @foreach (var series in ProfileSeries.OrderBy(s => s.SeriesCode))
+                {
+                    <option value="@series.SeriesCode">
+                        @series.SeriesCode - @(series.MaxLoadKg)kg (@(series.HeightMm)x@(series.WidthMm)mm) @(series.Material?.Name ?? "")
+                    </option>
+                }
+            </select>
+        </label>
+    </div>
+
+    <div class="control-group">
+        <label>
+            Track Length (mm)
+            <input type="range" min="2000" max="50000" step="500"
+                   value="@Config.TrackLength"
+                   @oninput="e => UpdateTrackLength(e)" />
+            <output>@Config.TrackLength</output>
+        </label>
+    </div>
+
+    <div class="control-group">
+        <label>
+            Height from Floor (mm)
+            <input type="range" min="2000" max="6000" step="100"
+                   value="@Config.HeightFromFloor"
+                   @oninput="e => UpdateHeightFromFloor(e)" />
+            <output>@Config.HeightFromFloor</output>
+        </label>
+    </div>
+</section>
+
+<section class="control-section">
+    <h3>Carriers</h3>
+
+    <div class="control-group">
+        <label>
+            Carrier Spacing (mm)
+            <input type="range" min="300" max="3000" step="100"
+                   value="@Config.CarrierSpacing"
+                   @oninput="e => UpdateCarrierSpacing(e)" />
+            <output>@Config.CarrierSpacing</output>
+        </label>
+    </div>
+
+    <div class="control-group">
+        <label>
+            Number of Carriers
+            <input type="range" min="1" max="50" step="1"
+                   value="@Config.NumCarriers"
+                   @oninput="e => UpdateNumCarriers(e)" />
+            <output>@Config.NumCarriers</output>
+        </label>
+    </div>
+
+    <div class="control-group">
+        <label>
+            Load per Carrier (kg)
+            <input type="range" min="10" max="500" step="10"
+                   value="@Config.LoadPerCarrier"
+                   @oninput="e => UpdateLoadPerCarrier(e)" />
+            <output>@Config.LoadPerCarrier</output>
+        </label>
+    </div>
+</section>
+
+<section class="control-section">
+    <h3>Track Layout</h3>
+
+    <div class="control-group checkbox">
+        <label>
+            <input type="checkbox" checked="@Config.IncludeCurves"
+                   @onchange="e => UpdateIncludeCurves(e)" />
+            Include Curves
+        </label>
+    </div>
+
+    @if (Config.IncludeCurves)
+    {
+        <div class="control-group">
+            <label>
+                Curve Radius (mm)
+                <input type="range" min="300" max="2000" step="50"
+                       value="@Config.CurveRadius"
+                       @oninput="e => UpdateCurveRadius(e)" />
+                <output>@Config.CurveRadius</output>
+            </label>
+        </div>
+    }
+
+    <div class="control-group">
+        <label>
+            Incline Angle (degrees)
+            <input type="range" min="0" max="15" step="1"
+                   value="@Config.InclineAngle"
+                   @oninput="e => UpdateInclineAngle(e)" />
+            <output>@Config.InclineAngle</output>
+        </label>
+    </div>
+
+    <div class="control-group">
+        <label>
+            Drive Units
+            <input type="range" min="1" max="5" step="1"
+                   value="@Config.DriveUnits"
+                   @oninput="e => UpdateDriveUnits(e)" />
+            <output>@Config.DriveUnits</output>
+        </label>
+    </div>
+</section>
+
+<section class="control-section summary">
+    <h3>Summary</h3>
+    <dl>
+        <dt>Total Load Capacity</dt>
+        <dd>@(Config.NumCarriers * Config.LoadPerCarrier) kg</dd>
+        <dt>Track Profile</dt>
+        <dd>@Config.TrackProfile</dd>
+        <dt>Carriers</dt>
+        <dd>@Config.NumCarriers units</dd>
+    </dl>
+</section>
+
+@code {
+    [Parameter] public OverheadConveyorConfig Config { get; set; } = new();
+    [Parameter] public List<ProfileSeries> ProfileSeries { get; set; } = new();
+    [Parameter] public EventCallback OnConfigChanged { get; set; }
+
+    private async Task UpdateTrackProfile(ChangeEventArgs e)
+    {
+        Config.TrackProfile = e.Value?.ToString() ?? "24.000";
+        await OnConfigChanged.InvokeAsync();
+    }
+
+    private async Task UpdateTrackLength(ChangeEventArgs e)
+    {
+        if (double.TryParse(e.Value?.ToString(), out var val))
+        {
+            Config.TrackLength = val;
+            await OnConfigChanged.InvokeAsync();
+        }
+    }
+
+    private async Task UpdateHeightFromFloor(ChangeEventArgs e)
+    {
+        if (double.TryParse(e.Value?.ToString(), out var val))
+        {
+            Config.HeightFromFloor = val;
+            await OnConfigChanged.InvokeAsync();
+        }
+    }
+
+    private async Task UpdateCarrierSpacing(ChangeEventArgs e)
+    {
+        if (double.TryParse(e.Value?.ToString(), out var val))
+        {
+            Config.CarrierSpacing = val;
+            await OnConfigChanged.InvokeAsync();
+        }
+    }
+
+    private async Task UpdateNumCarriers(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var val))
+        {
+            Config.NumCarriers = val;
+            await OnConfigChanged.InvokeAsync();
+        }
+    }
+
+    private async Task UpdateLoadPerCarrier(ChangeEventArgs e)
+    {
+        if (double.TryParse(e.Value?.ToString(), out var val))
+        {
+            Config.LoadPerCarrier = val;
+            await OnConfigChanged.InvokeAsync();
+        }
+    }
+
+    private async Task UpdateIncludeCurves(ChangeEventArgs e)
+    {
+        Config.IncludeCurves = (bool)(e.Value ?? false);
+        await OnConfigChanged.InvokeAsync();
+    }
+
+    private async Task UpdateCurveRadius(ChangeEventArgs e)
+    {
+        if (double.TryParse(e.Value?.ToString(), out var val))
+        {
+            Config.CurveRadius = val;
+            await OnConfigChanged.InvokeAsync();
+        }
+    }
+
+    private async Task UpdateInclineAngle(ChangeEventArgs e)
+    {
+        if (double.TryParse(e.Value?.ToString(), out var val))
+        {
+            Config.InclineAngle = val;
+            await OnConfigChanged.InvokeAsync();
+        }
+    }
+
+    private async Task UpdateDriveUnits(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var val))
+        {
+            Config.DriveUnits = val;
+            await OnConfigChanged.InvokeAsync();
+        }
+    }
+}

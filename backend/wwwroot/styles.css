@@ -1,0 +1,564 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+:root {
+    --bg-dark: #1a1a2e;
+    --bg-panel: #16213e;
+    --accent: #0f3460;
+    --highlight: #e94560;
+    --success: #10b981;
+    --text: #eaeaea;
+    --text-muted: #a0a0a0;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+    background: var(--bg-dark);
+    color: var(--text);
+    overflow: hidden;
+}
+
+.container {
+    display: flex;
+    height: 100vh;
+}
+
+/* Controls Panel */
+.controls-panel {
+    width: 340px;
+    background: var(--bg-panel);
+    padding: 24px;
+    overflow-y: auto;
+    border-right: 1px solid var(--accent);
+}
+
+.controls-panel h1 {
+    font-size: 1.4rem;
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+
+.subtitle {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--accent);
+}
+
+/* Type Selector */
+.type-selector {
+    margin-bottom: 20px;
+}
+
+.type-toggle {
+    display: flex;
+    gap: 0;
+    border-radius: 6px;
+    overflow: hidden;
+    border: 1px solid var(--accent);
+}
+
+.type-btn {
+    flex: 1;
+    padding: 10px 16px;
+    background: var(--accent);
+    border: none;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+}
+
+.type-btn:first-child {
+    border-radius: 5px 0 0 5px;
+}
+
+.type-btn:last-child {
+    border-radius: 0 5px 5px 0;
+}
+
+.type-btn:hover:not(.active) {
+    background: #1a4a7a;
+}
+
+.type-btn.active {
+    background: var(--highlight);
+    color: white;
+}
+
+/* Conditional visibility for conveyor types */
+.roller-only,
+.overhead-only {
+    display: none;
+}
+
+body.mode-roller .roller-only {
+    display: block;
+}
+
+body.mode-overhead .overhead-only {
+    display: block;
+}
+
+/* Checkbox label styling */
+.checkbox-label {
+    display: flex !important;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+}
+
+.checkbox-label input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--highlight);
+    cursor: pointer;
+}
+
+.checkbox-label span {
+    margin-bottom: 0 !important;
+}
+
+.control-group {
+    margin-bottom: 24px;
+}
+
+.control-group h2 {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--highlight);
+    margin-bottom: 12px;
+}
+
+.control-group label {
+    display: block;
+    margin-bottom: 16px;
+}
+
+.control-group label span {
+    display: block;
+    font-size: 0.9rem;
+    margin-bottom: 6px;
+    color: var(--text-muted);
+}
+
+input[type="range"] {
+    width: calc(100% - 60px);
+    height: 4px;
+    background: var(--accent);
+    border-radius: 2px;
+    outline: none;
+    -webkit-appearance: none;
+    vertical-align: middle;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    background: var(--highlight);
+    border-radius: 50%;
+    cursor: pointer;
+}
+
+input[type="range"]::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    background: var(--highlight);
+    border-radius: 50%;
+    cursor: pointer;
+    border: none;
+}
+
+output {
+    display: inline-block;
+    width: 50px;
+    text-align: right;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text);
+    vertical-align: middle;
+}
+
+select {
+    width: 100%;
+    padding: 10px 12px;
+    background: var(--accent);
+    border: 1px solid #2a4a7a;
+    border-radius: 6px;
+    color: var(--text);
+    font-size: 0.9rem;
+    cursor: pointer;
+    outline: none;
+}
+
+select:focus {
+    border-color: var(--highlight);
+}
+
+/* Import Section */
+.import-section {
+    background: rgba(15, 52, 96, 0.3);
+    padding: 16px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+}
+
+.import-buttons {
+    display: flex;
+    gap: 10px;
+}
+
+.file-upload-btn {
+    flex: 1;
+    display: block;
+    margin-bottom: 0 !important;
+}
+
+.file-upload-btn span {
+    display: block;
+    padding: 10px 12px;
+    background: var(--accent);
+    border: 1px dashed #2a4a7a;
+    border-radius: 6px;
+    text-align: center;
+    cursor: pointer;
+    font-size: 0.85rem;
+    color: var(--text) !important;
+    transition: border-color 0.2s, background 0.2s;
+}
+
+.file-upload-btn:hover span {
+    border-color: var(--highlight);
+    background: rgba(233, 69, 96, 0.1);
+}
+
+.import-status {
+    margin-top: 10px;
+    font-size: 0.8rem;
+    color: var(--success);
+    min-height: 20px;
+}
+
+.import-status.error {
+    color: var(--highlight);
+}
+
+/* Config List */
+.config-list select {
+    height: 100px;
+    margin-bottom: 10px;
+}
+
+.config-list select option {
+    padding: 6px 10px;
+}
+
+.btn-small {
+    padding: 8px 16px;
+    background: var(--accent);
+    border: 1px solid #2a4a7a;
+    border-radius: 4px;
+    color: var(--text);
+    font-size: 0.85rem;
+    cursor: pointer;
+    width: 100%;
+}
+
+.btn-small:hover {
+    background: #1a5a9a;
+}
+
+/* Specifications */
+.specs {
+    background: rgba(15, 52, 96, 0.5);
+    padding: 16px;
+    border-radius: 8px;
+    margin-top: 20px;
+}
+
+.spec-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.spec {
+    display: flex;
+    flex-direction: column;
+}
+
+.spec-label {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.spec-value {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text);
+}
+
+/* Action Buttons */
+.actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 24px;
+    padding-top: 20px;
+    border-top: 1px solid var(--accent);
+}
+
+button {
+    padding: 12px 20px;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.95rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: transform 0.1s, box-shadow 0.2s;
+}
+
+button:hover {
+    transform: translateY(-1px);
+}
+
+button:active {
+    transform: translateY(0);
+}
+
+button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.btn-primary {
+    background: var(--highlight);
+    color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+    box-shadow: 0 4px 12px rgba(233, 69, 96, 0.4);
+}
+
+.btn-secondary {
+    background: var(--accent);
+    color: var(--text);
+    border: 1px solid #2a4a7a;
+}
+
+.btn-secondary:hover:not(:disabled) {
+    background: #1a5a9a;
+}
+
+.btn-accent {
+    background: var(--success);
+    color: white;
+}
+
+.btn-accent:hover:not(:disabled) {
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+}
+
+/* Viewport */
+.viewport {
+    flex: 1;
+    position: relative;
+    background: linear-gradient(135deg, #0d1b2a 0%, #1b263b 100%);
+}
+
+#canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+.viewport-controls {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.5);
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+/* Loading Overlay */
+.loading-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(13, 27, 42, 0.9);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    z-index: 100;
+}
+
+.spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid var(--accent);
+    border-top-color: var(--highlight);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Modal */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background: var(--bg-panel);
+    border-radius: 12px;
+    padding: 32px;
+    width: 90%;
+    max-width: 500px;
+    max-height: 90vh;
+    overflow-y: auto;
+    position: relative;
+    border: 1px solid var(--accent);
+}
+
+.modal-close {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 1.5rem;
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+}
+
+.modal-close:hover {
+    color: var(--highlight);
+    transform: none;
+}
+
+.modal-content h2 {
+    margin-bottom: 24px;
+    font-size: 1.3rem;
+}
+
+.form-group {
+    margin-bottom: 16px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 0.9rem;
+    color: var(--text-muted);
+}
+
+.form-group input,
+.form-group textarea {
+    width: 100%;
+    padding: 10px 12px;
+    background: var(--accent);
+    border: 1px solid #2a4a7a;
+    border-radius: 6px;
+    color: var(--text);
+    font-size: 0.9rem;
+    outline: none;
+}
+
+.form-group input:focus,
+.form-group textarea:focus {
+    border-color: var(--highlight);
+}
+
+.form-group textarea {
+    resize: vertical;
+    font-family: inherit;
+}
+
+.config-summary {
+    background: rgba(15, 52, 96, 0.5);
+    padding: 12px;
+    border-radius: 6px;
+}
+
+.config-summary h3 {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+}
+
+.config-summary pre {
+    font-size: 0.8rem;
+    color: var(--text);
+    white-space: pre-wrap;
+    font-family: 'Consolas', 'Monaco', monospace;
+}
+
+#quote-form button[type="submit"] {
+    width: 100%;
+    margin-top: 8px;
+}
+
+/* Scrollbar */
+.controls-panel::-webkit-scrollbar,
+.modal-content::-webkit-scrollbar {
+    width: 6px;
+}
+
+.controls-panel::-webkit-scrollbar-track,
+.modal-content::-webkit-scrollbar-track {
+    background: var(--bg-dark);
+}
+
+.controls-panel::-webkit-scrollbar-thumb,
+.modal-content::-webkit-scrollbar-thumb {
+    background: var(--accent);
+    border-radius: 3px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .container {
+        flex-direction: column;
+    }
+
+    .controls-panel {
+        width: 100%;
+        height: auto;
+        max-height: 40vh;
+        order: 2;
+    }
+
+    .viewport {
+        order: 1;
+        min-height: 60vh;
+    }
+}

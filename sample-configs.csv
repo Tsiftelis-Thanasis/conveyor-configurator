@@ -1,0 +1,6 @@
+name,length,width,height,rollerDiameter,rollerSpacing,loadCapacity,driveType
+Small Conveyor,1000,400,600,40,80,100,gravity
+Medium Conveyor,2000,600,750,50,100,300,powered
+Large Conveyor,3500,800,900,60,120,500,powered
+Heavy Duty,5000,1000,850,80,150,1000,powered
+Compact Unit,800,300,500,30,60,100,gravity

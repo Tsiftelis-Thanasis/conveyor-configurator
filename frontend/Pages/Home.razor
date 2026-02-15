@@ -1,0 +1,365 @@
+@page "/"
+@using frontend.Models
+@using frontend.Services
+@using frontend.Shared
+@inject ThreeJsInterop ThreeJs
+@inject ConveyorApiService Api
+@inject IJSRuntime JS
+@implements IAsyncDisposable
+
+<PageTitle>Overhead Conveyor Configurator</PageTitle>
+
+<div class="app-container">
+    <aside class="control-panel">
+        <header class="panel-header">
+            <h1>Overhead Conveyor</h1>
+            <p class="panel-subtitle">Configure your NIKO enclosed track system</p>
+        </header>
+
+        <OverheadControls Config="OverheadConfig"
+                          ProfileSeries="ProfileSeriesList"
+                          OnConfigChanged="OnOverheadConfigChanged" />
+
+        <section class="actions">
+            <button class="btn-primary" @onclick="GenerateBom">Generate Parts List</button>
+            <button class="btn-secondary" @onclick="ExportStep">Export STEP</button>
+        </section>
+
+        @if (!string.IsNullOrEmpty(StatusMessage))
+        {
+            <div class="status-message @StatusClass">@StatusMessage</div>
+        }
+    </aside>
+
+    <main class="viewport">
+        <div id="three-container" class="three-container"></div>
+        <div class="view-controls">
+            <button @onclick="SetViewIso" title="Isometric View">ISO</button>
+            <button @onclick="SetViewTop" title="Top View">TOP</button>
+            <button @onclick="SetViewFront" title="Front View">FRONT</button>
+            <button @onclick="SetViewSide" title="Side View">SIDE</button>
+            <button @onclick="ResetCamera" title="Reset Camera">RESET</button>
+        </div>
+    </main>
+</div>
+
+@if (ShowBomPanel)
+{
+    <BomPanel BomItems="GeneratedBom"
+              AvailableTrolleys="AvailableTrolleys"
+              AvailableBends="AvailableBends"
+              AvailableBrackets="AvailableBrackets"
+              OnClose="CloseBomPanel"
+              OnRequestQuote="RequestQuoteWithBom"
+              OnItemChanged="OnBomItemChanged" />
+}
+
+@if (ShowQuoteModal)
+{
+    <QuoteModal ConveyorType="overhead"
+                OverheadConfig="OverheadConfig"
+                BomItems="GeneratedBom"
+                OnClose="CloseQuoteModal"
+                OnSubmit="SubmitQuote" />
+}
+
+@code {
+    private OverheadConveyorConfig OverheadConfig { get; set; } = new();
+    private List<ProfileSeries> ProfileSeriesList { get; set; } = new();
+
+    // BOM-related state
+    private bool ShowBomPanel { get; set; }
+    private List<BomItem> GeneratedBom { get; set; } = new();
+    private List<Trolley> AvailableTrolleys { get; set; } = new();
+    private List<TrackBend> AvailableBends { get; set; } = new();
+    private List<Bracket> AvailableBrackets { get; set; } = new();
+
+    private bool ShowQuoteModal { get; set; }
+    private string? StatusMessage { get; set; }
+    private string StatusClass { get; set; } = "";
+
+    private bool _initialized;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !_initialized)
+        {
+            _initialized = true;
+            await ThreeJs.InitializeSceneAsync("three-container");
+            await BuildConveyor();
+
+            try
+            {
+                ProfileSeriesList = await Api.GetProfileSeriesAsync("NIKO");
+                if (ProfileSeriesList.Any())
+                {
+                    OverheadConfig.TrackProfile = ProfileSeriesList.First().SeriesCode;
+                }
+                StateHasChanged();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Failed to load profile series: {ex.Message}");
+            }
+        }
+    }
+
+    private async Task OnOverheadConfigChanged()
+    {
+        await BuildConveyor();
+    }
+
+    private async Task BuildConveyor()
+    {
+        if (!_initialized) return;
+        await ThreeJs.BuildOverheadConveyorAsync(OverheadConfig);
+    }
+
+    private async Task SetViewIso() => await ThreeJs.SetViewAsync("iso");
+    private async Task SetViewTop() => await ThreeJs.SetViewAsync("top");
+    private async Task SetViewFront() => await ThreeJs.SetViewAsync("front");
+    private async Task SetViewSide() => await ThreeJs.SetViewAsync("side");
+
+    private async Task ResetCamera()
+    {
+        await ThreeJs.ResetCameraAsync();
+    }
+
+    private async Task GenerateBom()
+    {
+        try
+        {
+            ShowStatus("Generating parts list...", "info");
+
+            // Load available parts for the selected series
+            var series = OverheadConfig.TrackProfile;
+            AvailableTrolleys = await Api.GetTrolleysAsync("NIKO", series);
+            AvailableBends = await Api.GetTrackBendsAsync("NIKO", series);
+            AvailableBrackets = await Api.GetBracketsAsync("NIKO", series);
+
+            // Generate BOM based on configuration
+            GeneratedBom = GenerateBomFromConfig();
+
+            ShowBomPanel = true;
+            ShowStatus("Parts list generated!", "success");
+        }
+        catch (Exception ex)
+        {
+            ShowStatus($"Failed to generate parts list: {ex.Message}", "error");
+        }
+    }
+
+    private List<BomItem> GenerateBomFromConfig()
+    {
+        var bom = new List<BomItem>();
+        var config = OverheadConfig;
+
+        // 1. Track Profile - straight sections (assuming 6m standard lengths)
+        var trackLengthM = config.TrackLength / 1000.0;
+        var standardTrackLength = 6.0; // 6 meter sections
+        var trackSections = (int)Math.Ceiling(trackLengthM / standardTrackLength);
+
+        var selectedSeries = ProfileSeriesList.FirstOrDefault(s => s.SeriesCode == config.TrackProfile);
+        bom.Add(new BomItem
+        {
+            Category = "Track Profile",
+            PartNumber = $"TRACK-{config.TrackProfile}",
+            Description = $"Enclosed Track Profile {config.TrackProfile} ({selectedSeries?.HeightMm}x{selectedSeries?.WidthMm}mm) - 6m section",
+            Quantity = trackSections,
+            UnitPrice = 250.00, // Placeholder price
+            CanSwap = false
+        });
+
+        // 2. Trolleys - based on carrier count and load requirements
+        var requiredSwl = (int)Math.Ceiling(config.LoadPerCarrier);
+        var selectedTrolley = AvailableTrolleys
+            .Where(t => t.SafeWorkingLoadKg >= requiredSwl)
+            .OrderBy(t => t.SafeWorkingLoadKg)
+            .FirstOrDefault();
+
+        if (selectedTrolley != null)
+        {
+            bom.Add(new BomItem
+            {
+                Category = "Trolleys",
+                PartNumber = selectedTrolley.PartNumber,
+                Description = $"{selectedTrolley.TrolleyType} Trolley - {selectedTrolley.SafeWorkingLoadKg}kg SWL",
+                Quantity = config.NumCarriers,
+                UnitPrice = selectedTrolley.Price ?? 85.00,
+                CanSwap = true,
+                AlternativePartNumbers = AvailableTrolleys
+                    .Where(t => t.SafeWorkingLoadKg >= requiredSwl && t.PartNumber != selectedTrolley.PartNumber)
+                    .Select(t => t.PartNumber)
+                    .ToList()
+            });
+        }
+
+        // 3. Track Bends - if curves are included
+        if (config.IncludeCurves)
+        {
+            // Find bends close to the specified radius
+            var selectedBend = AvailableBends
+                .OrderBy(b => Math.Abs(b.RadiusMm - config.CurveRadius))
+                .FirstOrDefault();
+
+            if (selectedBend != null)
+            {
+                // Assume 2 bends for a simple curved layout (90° turns)
+                bom.Add(new BomItem
+                {
+                    Category = "Track Bends",
+                    PartNumber = selectedBend.PartNumber,
+                    Description = $"{selectedBend.AngleDegrees}° Bend - R{selectedBend.RadiusMm}mm",
+                    Quantity = 2,
+                    UnitPrice = selectedBend.Price ?? 180.00,
+                    CanSwap = true,
+                    AlternativePartNumbers = AvailableBends
+                        .Where(b => b.PartNumber != selectedBend.PartNumber)
+                        .Select(b => b.PartNumber)
+                        .ToList()
+                });
+            }
+        }
+
+        // 4. Mounting Brackets - every 2 meters
+        var bracketSpacing = 2000.0; // 2 meters
+        var bracketCount = (int)Math.Ceiling(config.TrackLength / bracketSpacing) + 1;
+
+        var selectedBracket = AvailableBrackets.FirstOrDefault();
+        if (selectedBracket != null)
+        {
+            bom.Add(new BomItem
+            {
+                Category = "Mounting Brackets",
+                PartNumber = selectedBracket.PartNumber,
+                Description = $"{selectedBracket.BracketType} Bracket",
+                Quantity = bracketCount,
+                UnitPrice = selectedBracket.Price ?? 45.00,
+                CanSwap = true,
+                AlternativePartNumbers = AvailableBrackets
+                    .Where(b => b.PartNumber != selectedBracket.PartNumber)
+                    .Select(b => b.PartNumber)
+                    .ToList()
+            });
+        }
+
+        // 5. End Stops - 2 per track (start and end)
+        bom.Add(new BomItem
+        {
+            Category = "End Stops",
+            PartNumber = $"STOP-{config.TrackProfile}",
+            Description = "Track End Stop",
+            Quantity = 2,
+            UnitPrice = 35.00,
+            CanSwap = false
+        });
+
+        // 6. Drive Unit placeholder
+        if (config.DriveUnits > 0)
+        {
+            bom.Add(new BomItem
+            {
+                Category = "Drive Units",
+                PartNumber = $"DRIVE-{config.TrackProfile}",
+                Description = "Motorized Drive Unit",
+                Quantity = config.DriveUnits,
+                UnitPrice = 1250.00,
+                CanSwap = false
+            });
+        }
+
+        return bom;
+    }
+
+    private void CloseBomPanel()
+    {
+        ShowBomPanel = false;
+    }
+
+    private void OnBomItemChanged(BomItem item)
+    {
+        // Update the item in the list
+        var index = GeneratedBom.FindIndex(b => b.PartNumber == item.PartNumber);
+        if (index >= 0)
+        {
+            GeneratedBom[index] = item;
+        }
+        StateHasChanged();
+    }
+
+    private void RequestQuoteWithBom()
+    {
+        ShowBomPanel = false;
+        ShowQuoteModal = true;
+    }
+
+    private async Task ExportStep()
+    {
+        try
+        {
+            ShowStatus("Generating STEP file...", "info");
+
+            var data = await Api.ExportOverheadStepAsync(OverheadConfig);
+            var fileName = "overhead-conveyor.step";
+
+            if (data != null)
+            {
+                var base64 = Convert.ToBase64String(data);
+                await JS.InvokeVoidAsync("downloadFile", fileName, base64);
+                ShowStatus("STEP file exported successfully!", "success");
+            }
+            else
+            {
+                ShowStatus("Failed to generate STEP file", "error");
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowStatus($"Export failed: {ex.Message}", "error");
+        }
+    }
+
+    private void CloseQuoteModal()
+    {
+        ShowQuoteModal = false;
+    }
+
+    private async Task SubmitQuote(QuoteRequest quote)
+    {
+        try
+        {
+            var response = await Api.SubmitQuoteAsync(quote);
+            if (response?.Success == true)
+            {
+                ShowQuoteModal = false;
+                ShowStatus($"Quote submitted! ID: {response.QuoteId}", "success");
+            }
+            else
+            {
+                ShowStatus("Failed to submit quote", "error");
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowStatus($"Quote submission failed: {ex.Message}", "error");
+        }
+    }
+
+    private void ShowStatus(string message, string type)
+    {
+        StatusMessage = message;
+        StatusClass = type;
+        StateHasChanged();
+
+        _ = Task.Delay(3000).ContinueWith(_ =>
+        {
+            StatusMessage = null;
+            InvokeAsync(StateHasChanged);
+        });
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await ThreeJs.DisposeAsync();
+    }
+}

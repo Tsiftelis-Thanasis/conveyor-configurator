@@ -1,0 +1,5 @@
+name,trackLength,heightFromFloor,carrierSpacing,loadPerCarrier,numCarriers,includeCurves,driveUnits
+Paint Line,15000,3500,1200,30,12,true,2
+Assembly Loop,20000,3000,1000,50,20,true,3
+Storage Circuit,8000,2500,800,25,10,false,1
+Heavy Parts,12000,4000,1500,100,8,false,2

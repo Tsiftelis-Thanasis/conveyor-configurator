@@ -1,0 +1,168 @@
+@using frontend.Models
+
+<div class="bom-overlay" @onclick="OnClose">
+    <div class="bom-panel" @onclick:stopPropagation="true">
+        <header class="bom-header">
+            <h2>Parts List (Bill of Materials)</h2>
+            <button class="close-btn" @onclick="OnClose">&times;</button>
+        </header>
+
+        <div class="bom-content">
+            @if (BomItems == null || !BomItems.Any())
+            {
+                <p class="no-items">No parts generated. Please configure your conveyor first.</p>
+            }
+            else
+            {
+                <table class="bom-table">
+                    <thead>
+                        <tr>
+                            <th>Category</th>
+                            <th>Part Number</th>
+                            <th>Description</th>
+                            <th>Qty</th>
+                            <th>Unit Price</th>
+                            <th>Total</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in BomItems)
+                        {
+                            <tr>
+                                <td>@item.Category</td>
+                                <td class="part-number">@item.PartNumber</td>
+                                <td>@item.Description</td>
+                                <td>
+                                    <input type="number" min="0" value="@item.Quantity"
+                                           @onchange="e => UpdateQuantity(item, e)"
+                                           class="qty-input" />
+                                </td>
+                                <td>@item.UnitPrice.ToString("C")</td>
+                                <td class="total-cell">@item.TotalPrice.ToString("C")</td>
+                                <td>
+                                    @if (item.CanSwap && item.AlternativePartNumbers.Any())
+                                    {
+                                        <button class="btn-swap" @onclick="() => ToggleSwapOptions(item)">
+                                            Swap
+                                        </button>
+                                    }
+                                </td>
+                            </tr>
+                            @if (item.CanSwap && ShowSwapFor == item.PartNumber)
+                            {
+                                <tr class="swap-row">
+                                    <td colspan="7">
+                                        <div class="swap-options">
+                                            <span>Alternatives:</span>
+                                            @foreach (var alt in item.AlternativePartNumbers.Take(5))
+                                            {
+                                                <button class="btn-alt" @onclick="() => SwapPart(item, alt)">
+                                                    @alt
+                                                </button>
+                                            }
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                    <tfoot>
+                        <tr class="total-row">
+                            <td colspan="5"><strong>Estimated Total</strong></td>
+                            <td colspan="2"><strong>@BomItems.Sum(i => i.TotalPrice).ToString("C")</strong></td>
+                        </tr>
+                    </tfoot>
+                </table>
+
+                <p class="disclaimer">* Prices are estimates. Final pricing will be confirmed in your quote.</p>
+            }
+        </div>
+
+        <div class="bom-actions">
+            <button class="btn-secondary" @onclick="OnClose">Close</button>
+            <button class="btn-primary" @onclick="OnRequestQuote">Request Quote</button>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public List<BomItem> BomItems { get; set; } = new();
+    [Parameter] public List<Trolley> AvailableTrolleys { get; set; } = new();
+    [Parameter] public List<TrackBend> AvailableBends { get; set; } = new();
+    [Parameter] public List<Bracket> AvailableBrackets { get; set; } = new();
+    [Parameter] public EventCallback OnClose { get; set; }
+    [Parameter] public EventCallback OnRequestQuote { get; set; }
+    [Parameter] public EventCallback<BomItem> OnItemChanged { get; set; }
+
+    private string? ShowSwapFor { get; set; }
+
+    private void UpdateQuantity(BomItem item, ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var qty) && qty >= 0)
+        {
+            item.Quantity = qty;
+            OnItemChanged.InvokeAsync(item);
+        }
+    }
+
+    private void ToggleSwapOptions(BomItem item)
+    {
+        ShowSwapFor = ShowSwapFor == item.PartNumber ? null : item.PartNumber;
+    }
+
+    private void SwapPart(BomItem item, string newPartNumber)
+    {
+        // Find the alternative part details
+        var oldPartNumber = item.PartNumber;
+
+        // Update based on category
+        switch (item.Category)
+        {
+            case "Trolleys":
+                var trolley = AvailableTrolleys.FirstOrDefault(t => t.PartNumber == newPartNumber);
+                if (trolley != null)
+                {
+                    item.PartNumber = trolley.PartNumber;
+                    item.Description = $"{trolley.TrolleyType} Trolley - {trolley.SafeWorkingLoadKg}kg SWL";
+                    item.UnitPrice = trolley.Price ?? item.UnitPrice;
+                    item.AlternativePartNumbers = AvailableTrolleys
+                        .Where(t => t.PartNumber != newPartNumber)
+                        .Select(t => t.PartNumber)
+                        .ToList();
+                }
+                break;
+
+            case "Track Bends":
+                var bend = AvailableBends.FirstOrDefault(b => b.PartNumber == newPartNumber);
+                if (bend != null)
+                {
+                    item.PartNumber = bend.PartNumber;
+                    item.Description = $"{bend.AngleDegrees}° Bend - R{bend.RadiusMm}mm";
+                    item.UnitPrice = bend.Price ?? item.UnitPrice;
+                    item.AlternativePartNumbers = AvailableBends
+                        .Where(b => b.PartNumber != newPartNumber)
+                        .Select(b => b.PartNumber)
+                        .ToList();
+                }
+                break;
+
+            case "Mounting Brackets":
+                var bracket = AvailableBrackets.FirstOrDefault(b => b.PartNumber == newPartNumber);
+                if (bracket != null)
+                {
+                    item.PartNumber = bracket.PartNumber;
+                    item.Description = $"{bracket.BracketType} Bracket";
+                    item.UnitPrice = bracket.Price ?? item.UnitPrice;
+                    item.AlternativePartNumbers = AvailableBrackets
+                        .Where(b => b.PartNumber != newPartNumber)
+                        .Select(b => b.PartNumber)
+                        .ToList();
+                }
+                break;
+        }
+
+        ShowSwapFor = null;
+        OnItemChanged.InvokeAsync(item);
+    }
+}
