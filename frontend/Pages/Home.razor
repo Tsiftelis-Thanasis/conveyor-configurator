@@ -23,6 +23,7 @@
         <section class="actions">
             <button class="btn-primary" @onclick="GenerateBom">Generate Parts List</button>
             <button class="btn-secondary" @onclick="ExportStep">Export STEP</button>
+            <button class="btn-secondary" @onclick="ShowCadImport">Import CAD Drawing</button>
         </section>
 
         @if (!string.IsNullOrEmpty(StatusMessage))
@@ -63,6 +64,12 @@
                 OnSubmit="SubmitQuote" />
 }
 
+@if (ShowCadImportModal)
+{
+    <CadImportModal OnClose="CloseCadImport"
+                    OnApplyConfig="ApplyCadConfiguration" />
+}
+
 @code {
     private OverheadConveyorConfig OverheadConfig { get; set; } = new();
     private List<ProfileSeries> ProfileSeriesList { get; set; } = new();
@@ -75,6 +82,7 @@
     private List<Bracket> AvailableBrackets { get; set; } = new();
 
     private bool ShowQuoteModal { get; set; }
+    private bool ShowCadImportModal { get; set; }
     private string? StatusMessage { get; set; }
     private string StatusClass { get; set; } = "";
 
@@ -343,6 +351,40 @@
         {
             ShowStatus($"Quote submission failed: {ex.Message}", "error");
         }
+    }
+
+    private void ShowCadImport()
+    {
+        ShowCadImportModal = true;
+    }
+
+    private void CloseCadImport()
+    {
+        ShowCadImportModal = false;
+    }
+
+    private async Task ApplyCadConfiguration(SuggestedConveyorConfig suggested)
+    {
+        OverheadConfig.TrackLength = suggested.TrackLength;
+        OverheadConfig.HeightFromFloor = suggested.HeightFromFloor;
+        OverheadConfig.NumCarriers = suggested.NumCarriers;
+        OverheadConfig.CarrierSpacing = suggested.CarrierSpacing;
+        OverheadConfig.IncludeCurves = suggested.IncludeCurves;
+        OverheadConfig.CurveRadius = suggested.CurveRadius;
+
+        // Update track profile if available
+        if (!string.IsNullOrEmpty(suggested.SuggestedProfile))
+        {
+            var matchingSeries = ProfileSeriesList.FirstOrDefault(s => s.SeriesCode == suggested.SuggestedProfile);
+            if (matchingSeries != null)
+            {
+                OverheadConfig.TrackProfile = suggested.SuggestedProfile;
+            }
+        }
+
+        ShowCadImportModal = false;
+        ShowStatus("Configuration applied from CAD import", "success");
+        await BuildConveyor();
     }
 
     private void ShowStatus(string message, string type)

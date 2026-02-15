@@ -1,0 +1,219 @@
+@using frontend.Models
+@using Microsoft.AspNetCore.Components.Forms
+@inject ConveyorApiService Api
+@inject ThreeJsInterop ThreeJs
+@implements IAsyncDisposable
+
+<div class="modal-overlay" @onclick="HandleOverlayClick">
+    <div class="modal-content cad-import-modal" @onclick:stopPropagation="true">
+        <header class="modal-header">
+            <h2>Import CAD Drawing</h2>
+            <button class="modal-close" @onclick="Close">&times;</button>
+        </header>
+
+        <div class="modal-body">
+            @if (CurrentStep == ImportStep.Upload)
+            {
+                <div class="upload-section">
+                    <p class="upload-instructions">
+                        Upload a DWG or DXF file to import your conveyor layout.
+                        The system will extract track dimensions and generate a 3D model.
+                    </p>
+
+                    <InputFile OnChange="HandleFileSelected" accept=".dwg,.dxf" class="file-input" />
+
+                    @if (!string.IsNullOrEmpty(SelectedFileName))
+                    {
+                        <div class="file-selected">
+                            Selected: <strong>@SelectedFileName</strong>
+                        </div>
+                    }
+
+                    @if (IsUploading)
+                    {
+                        <div class="uploading">
+                            <div class="spinner"></div>
+                            <span>Uploading and analyzing...</span>
+                        </div>
+                    }
+
+                    @if (!string.IsNullOrEmpty(ErrorMessage))
+                    {
+                        <div class="error-message">@ErrorMessage</div>
+                    }
+                </div>
+            }
+            else if (CurrentStep == ImportStep.Preview2D)
+            {
+                <div class="preview-section">
+                    <h3>2D Preview</h3>
+                    <CadPreview2D Result="ImportResult" />
+
+                    <div class="preview-actions">
+                        <button class="btn-secondary" @onclick="() => CurrentStep = ImportStep.Upload">
+                            Back
+                        </button>
+                        <button class="btn-primary" @onclick="Generate3D">
+                            Generate 3D Model
+                        </button>
+                    </div>
+                </div>
+            }
+            else if (CurrentStep == ImportStep.Preview3D)
+            {
+                <div class="apply-section">
+                    <h3>3D Model Generated</h3>
+                    <p>The 3D model has been loaded in the viewport. Review the suggested configuration below:</p>
+
+                    @if (ImportResult?.SuggestedConfig != null)
+                    {
+                        var config = ImportResult.SuggestedConfig;
+                        <div class="suggested-config">
+                            <div class="config-row">
+                                <span class="config-label">Track Length:</span>
+                                <span class="config-value">@($"{config.TrackLength:F0} mm")</span>
+                            </div>
+                            <div class="config-row">
+                                <span class="config-label">Height from Floor:</span>
+                                <span class="config-value">@($"{config.HeightFromFloor:F0} mm")</span>
+                            </div>
+                            <div class="config-row">
+                                <span class="config-label">Suggested Profile:</span>
+                                <span class="config-value">@config.SuggestedProfile</span>
+                            </div>
+                            <div class="config-row">
+                                <span class="config-label">Includes Curves:</span>
+                                <span class="config-value">@(config.IncludeCurves ? "Yes" : "No")</span>
+                            </div>
+                            @if (config.IncludeCurves)
+                            {
+                                <div class="config-row">
+                                    <span class="config-label">Curve Radius:</span>
+                                    <span class="config-value">@($"{config.CurveRadius:F0} mm")</span>
+                                </div>
+                                <div class="config-row">
+                                    <span class="config-label">Number of Curves:</span>
+                                    <span class="config-value">@config.CurveCount</span>
+                                </div>
+                            }
+                            <div class="config-row">
+                                <span class="config-label">Carriers:</span>
+                                <span class="config-value">@config.NumCarriers</span>
+                            </div>
+                            <div class="config-row">
+                                <span class="config-label">Carrier Spacing:</span>
+                                <span class="config-value">@($"{config.CarrierSpacing:F0} mm")</span>
+                            </div>
+                        </div>
+                    }
+
+                    <div class="apply-actions">
+                        <button class="btn-secondary" @onclick="Close">
+                            Cancel
+                        </button>
+                        <button class="btn-primary" @onclick="ApplyConfiguration">
+                            Apply Configuration
+                        </button>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public EventCallback OnClose { get; set; }
+
+    [Parameter]
+    public EventCallback<SuggestedConveyorConfig> OnApplyConfig { get; set; }
+
+    private enum ImportStep
+    {
+        Upload,
+        Preview2D,
+        Preview3D
+    }
+
+    private ImportStep CurrentStep { get; set; } = ImportStep.Upload;
+    private string? SelectedFileName { get; set; }
+    private CadImportResult? ImportResult { get; set; }
+    private bool IsUploading { get; set; }
+    private string? ErrorMessage { get; set; }
+
+    private async Task HandleFileSelected(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        if (file == null) return;
+
+        SelectedFileName = file.Name;
+        ErrorMessage = null;
+        IsUploading = true;
+        StateHasChanged();
+
+        try
+        {
+            // Upload and parse the file
+            using var stream = file.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024); // 10MB max
+            ImportResult = await Api.ImportCadFileAsync(stream, file.Name);
+
+            if (ImportResult?.Success == true)
+            {
+                CurrentStep = ImportStep.Preview2D;
+            }
+            else
+            {
+                ErrorMessage = ImportResult?.Error ?? "Failed to import CAD file";
+            }
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            IsUploading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task Generate3D()
+    {
+        if (ImportResult?.MeshData == null) return;
+
+        try
+        {
+            // Load the mesh into Three.js
+            await ThreeJs.LoadCadMeshAsync(ImportResult.MeshData);
+            CurrentStep = ImportStep.Preview3D;
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Error generating 3D model: {ex.Message}";
+        }
+    }
+
+    private async Task ApplyConfiguration()
+    {
+        if (ImportResult?.SuggestedConfig != null)
+        {
+            await OnApplyConfig.InvokeAsync(ImportResult.SuggestedConfig);
+        }
+        await Close();
+    }
+
+    private async Task Close()
+    {
+        await OnClose.InvokeAsync();
+    }
+
+    private async Task HandleOverlayClick()
+    {
+        await Close();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        // Cleanup if needed
+    }
+}

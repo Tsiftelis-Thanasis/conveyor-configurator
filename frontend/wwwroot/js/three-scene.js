@@ -338,6 +338,52 @@ export function setView(view) {
     controls.update();
 }
 
+export function loadCadMesh(meshData) {
+    if (!meshData || !meshData.vertices || meshData.vertices.length === 0) {
+        console.warn('No mesh data to load');
+        return;
+    }
+
+    clearScene();
+
+    // Create BufferGeometry from mesh data
+    const geometry = new THREE.BufferGeometry();
+
+    // Vertices are in millimeters, convert to Three.js units
+    const scaledVertices = new Float32Array(meshData.vertices.length);
+    for (let i = 0; i < meshData.vertices.length; i++) {
+        scaledVertices[i] = meshData.vertices[i] * SCALE;
+    }
+
+    geometry.setAttribute('position', new THREE.BufferAttribute(scaledVertices, 3));
+
+    if (meshData.indices && meshData.indices.length > 0) {
+        geometry.setIndex(meshData.indices);
+    }
+
+    // Compute normals if not provided
+    if (meshData.normals && meshData.normals.length > 0) {
+        geometry.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(meshData.normals), 3));
+    } else {
+        geometry.computeVertexNormals();
+    }
+
+    // Create mesh
+    const material = new THREE.MeshStandardMaterial({
+        color: 0xf6ad55,
+        metalness: 0.6,
+        roughness: 0.3,
+        side: THREE.DoubleSide
+    });
+
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    conveyorGroup.add(mesh);
+
+    centerAndFitCamera();
+}
+
 export function dispose() {
     window.removeEventListener('resize', resize);
     if (renderer) {
@@ -359,6 +405,7 @@ window.threeScene = {
     clearScene,
     buildRollerConveyor,
     buildOverheadConveyor,
+    loadCadMesh,
     resetCamera,
     setView,
     dispose,

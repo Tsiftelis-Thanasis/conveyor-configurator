@@ -99,8 +99,7 @@ app.MapPost("/api/quotes", async ([FromBody] QuoteRequest quote) =>
 // Get all quotes (admin endpoint)
 app.MapGet("/api/quotes", () => Results.Ok(quotes));
 
-// Parse uploaded CAD file and return mesh data
-// Note: CAD import requires OpenCascade integration - placeholder for now
+// Parse uploaded CAD file (DWG/DXF) and return mesh data
 app.MapPost("/api/import/cad", async (HttpRequest request) =>
 {
     if (!request.HasFormContentType)
@@ -113,17 +112,22 @@ app.MapPost("/api/import/cad", async (HttpRequest request) =>
         return Results.BadRequest("No file uploaded");
 
     var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
-    if (extension != ".step" && extension != ".stp" && extension != ".iges" && extension != ".igs")
-        return Results.BadRequest("Unsupported file format. Please upload STEP (.step, .stp) or IGES (.iges, .igs) files.");
+    if (extension != ".dwg" && extension != ".dxf")
+        return Results.BadRequest("Unsupported file format. Please upload DWG (.dwg) or DXF (.dxf) files.");
 
-    // TODO: Integrate with OpenCascade for actual CAD parsing
-    // For now, return a placeholder response
-    return Results.Ok(new {
-        success = false,
-        error = "CAD import is not yet implemented. OpenCascade integration required.",
-        fileName = file.FileName,
-        fileSize = file.Length
-    });
+    try
+    {
+        var service = new ConveyorApi.Services.CadImportService();
+        var result = service.ImportFile(file.OpenReadStream(), file.FileName);
+
+        return result.Success
+            ? Results.Ok(result)
+            : Results.BadRequest(new { error = result.Error });
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem($"Error importing CAD file: {ex.Message}");
+    }
 });
 
 // =============================================

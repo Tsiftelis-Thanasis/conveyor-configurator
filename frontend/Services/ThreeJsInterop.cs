@@ -54,6 +54,12 @@ public class ThreeJsInterop : IAsyncDisposable
         await _module!.InvokeVoidAsync("resize");
     }
 
+    public async Task LoadCadMeshAsync(CadMeshData meshData)
+    {
+        await EnsureModuleLoadedAsync();
+        await _module!.InvokeVoidAsync("loadCadMesh", meshData);
+    }
+
     public async ValueTask DisposeAsync()
     {
         if (_module is not null)

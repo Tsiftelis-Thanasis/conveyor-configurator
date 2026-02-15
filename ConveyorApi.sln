@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 18
+VisualStudioVersion = 18.4.11506.43 insiders
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ConveyorApi", "backend\ConveyorApi.csproj", "{45CF8D86-C6B7-297D-1076-3EDFFB14381B}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "frontend", "frontend\frontend.csproj", "{8F94D84D-5525-A66F-B0D4-2AED7225D780}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{45CF8D86-C6B7-297D-1076-3EDFFB14381B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{45CF8D86-C6B7-297D-1076-3EDFFB14381B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{45CF8D86-C6B7-297D-1076-3EDFFB14381B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{45CF8D86-C6B7-297D-1076-3EDFFB14381B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8F94D84D-5525-A66F-B0D4-2AED7225D780}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8F94D84D-5525-A66F-B0D4-2AED7225D780}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8F94D84D-5525-A66F-B0D4-2AED7225D780}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8F94D84D-5525-A66F-B0D4-2AED7225D780}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {9A80A6D9-0395-420E-9705-C77E5F9936C4}
+	EndGlobalSection
+EndGlobal

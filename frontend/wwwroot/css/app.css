@@ -641,6 +641,234 @@ form {
     justify-content: flex-end;
 }
 
+/* CAD Import Modal */
+.cad-import-modal {
+    max-width: 900px;
+    width: 95%;
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 1.5rem;
+    cursor: pointer;
+    line-height: 1;
+}
+
+.modal-close:hover {
+    color: var(--text-primary);
+}
+
+.modal-body {
+    padding: 1.5rem;
+}
+
+/* Upload Section */
+.upload-section {
+    text-align: center;
+}
+
+.upload-instructions {
+    color: var(--text-secondary);
+    margin-bottom: 1.5rem;
+    line-height: 1.6;
+}
+
+.file-input {
+    display: block;
+    width: 100%;
+    padding: 1rem;
+    border: 2px dashed var(--border-color);
+    border-radius: 8px;
+    background-color: var(--bg-dark);
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-bottom: 1rem;
+}
+
+.file-input:hover {
+    border-color: var(--accent);
+    background-color: var(--bg-section);
+}
+
+.file-selected {
+    padding: 0.75rem;
+    background-color: var(--bg-section);
+    border-radius: 4px;
+    color: var(--success);
+    margin-bottom: 1rem;
+}
+
+.uploading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    padding: 1rem;
+    color: var(--info);
+}
+
+.spinner {
+    width: 24px;
+    height: 24px;
+    border: 3px solid var(--border-color);
+    border-top-color: var(--info);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.error-message {
+    padding: 0.75rem;
+    background-color: rgba(233, 69, 96, 0.2);
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    border-radius: 4px;
+    margin-top: 1rem;
+}
+
+/* Preview Section */
+.preview-section {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.preview-section h3 {
+    color: var(--highlight);
+    margin: 0 0 0.5rem 0;
+}
+
+.preview-actions,
+.apply-actions {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: flex-end;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border-color);
+}
+
+/* 2D CAD Preview */
+.cad-preview-2d {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.cad-preview-2d canvas {
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background-color: var(--bg-dark);
+    width: 100%;
+    height: auto;
+}
+
+.cad-stats {
+    background-color: var(--bg-section);
+    padding: 1rem;
+    border-radius: 4px;
+}
+
+.cad-stats h4 {
+    color: var(--highlight);
+    margin: 0 0 0.75rem 0;
+    font-size: 0.9rem;
+}
+
+.stat-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.stat-row:last-child {
+    border-bottom: none;
+}
+
+.stat-label {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+}
+
+.stat-value {
+    color: var(--text-primary);
+    font-weight: 500;
+    font-size: 0.9rem;
+}
+
+.cad-legend {
+    display: flex;
+    gap: 1rem;
+    padding: 0.75rem;
+    background-color: var(--bg-section);
+    border-radius: 4px;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+}
+
+.legend-color {
+    width: 20px;
+    height: 12px;
+    border-radius: 2px;
+}
+
+/* Apply Section */
+.apply-section {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.apply-section h3 {
+    color: var(--highlight);
+    margin: 0;
+}
+
+.apply-section p {
+    color: var(--text-secondary);
+    margin: 0;
+    line-height: 1.6;
+}
+
+.suggested-config {
+    background-color: var(--bg-section);
+    padding: 1rem;
+    border-radius: 4px;
+}
+
+.config-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.config-row:last-child {
+    border-bottom: none;
+}
+
+.config-label {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+}
+
+.config-value {
+    color: var(--text-primary);
+    font-weight: 500;
+    font-size: 0.9rem;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
     .app-container {
@@ -672,5 +900,12 @@ form {
     .bom-table th,
     .bom-table td {
         padding: 0.5rem;
+    }
+
+    .cad-import-modal {
+        max-width: 100%;
+        width: 100%;
+        max-height: 100vh;
+        border-radius: 0;
     }
 }

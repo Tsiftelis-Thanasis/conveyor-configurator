@@ -120,4 +120,22 @@ public class ConveyorApiService
             return await response.Content.ReadFromJsonAsync<QuoteResponse>();
         return null;
     }
+
+    // Import CAD file (DWG/DXF)
+    public async Task<CadImportResult?> ImportCadFileAsync(Stream fileStream, string fileName)
+    {
+        using var content = new MultipartFormDataContent();
+        using var streamContent = new StreamContent(fileStream);
+        content.Add(streamContent, "file", fileName);
+
+        var response = await _http.PostAsync("/api/import/cad", content);
+        if (response.IsSuccessStatusCode)
+            return await response.Content.ReadFromJsonAsync<CadImportResult>();
+
+        return new CadImportResult
+        {
+            Success = false,
+            Error = $"Server returned {response.StatusCode}"
+        };
+    }
 }

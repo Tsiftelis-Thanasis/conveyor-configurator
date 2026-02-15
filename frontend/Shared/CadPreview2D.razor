@@ -1,0 +1,82 @@
+@using frontend.Models
+@inject IJSRuntime JS
+
+<div class="cad-preview-2d">
+    <canvas @ref="_canvasRef" width="800" height="600"></canvas>
+
+    <div class="cad-stats">
+        <h4>Track Statistics</h4>
+        <div class="stat-row">
+            <span class="stat-label">Total Straight Track:</span>
+            <span class="stat-value">@($"{Result?.TotalTrackLength:F0} mm")</span>
+        </div>
+        <div class="stat-row">
+            <span class="stat-label">Total Curve Length:</span>
+            <span class="stat-value">@($"{Result?.TotalCurveLength:F0} mm")</span>
+        </div>
+        <div class="stat-row">
+            <span class="stat-label">Number of Curves:</span>
+            <span class="stat-value">@Result?.CurveCount</span>
+        </div>
+        <div class="stat-row">
+            <span class="stat-label">Total Entities:</span>
+            <span class="stat-value">@Result?.Entities.Count</span>
+        </div>
+    </div>
+
+    <div class="cad-legend">
+        <div class="legend-item">
+            <span class="legend-color" style="background: #4488ff;"></span>
+            <span>Straight Track</span>
+        </div>
+        <div class="legend-item">
+            <span class="legend-color" style="background: #ff4444;"></span>
+            <span>Curved Track</span>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public CadImportResult? Result { get; set; }
+
+    private ElementReference _canvasRef;
+    private IJSObjectReference? _module;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && Result != null)
+        {
+            await RenderCanvas();
+        }
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (Result != null)
+        {
+            await RenderCanvas();
+        }
+    }
+
+    private async Task RenderCanvas()
+    {
+        if (_module == null)
+        {
+            _module = await JS.InvokeAsync<IJSObjectReference>("import", "./js/cad-preview-2d.js");
+        }
+
+        if (Result != null)
+        {
+            await _module.InvokeVoidAsync("renderCadPreview", _canvasRef, Result);
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_module != null)
+        {
+            await _module.DisposeAsync();
+        }
+    }
+}
