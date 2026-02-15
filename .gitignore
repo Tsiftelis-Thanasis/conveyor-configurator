@@ -423,10 +423,11 @@ FodyWeavers.xsd
 **/bin/
 **/obj/
 
+# Large reference files (keep locally but don't commit)
+*.pdf
+
 # Keep important documentation and test files
-!CAD_IMPORT_README.md
-!IMPLEMENTATION_SUMMARY.md
-!QUICK_START_GUIDE.md
 !README.md
+!CLAUDE.md
 !test-track.dxf
 !sample-*.csv
