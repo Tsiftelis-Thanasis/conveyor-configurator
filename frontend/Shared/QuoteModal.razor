@@ -1,4 +1,5 @@
 @using frontend.Models
+@inject IJSRuntime JS
 
 <div class="modal-overlay" @onclick="OnClose">
     <div class="modal-content" @onclick:stopPropagation="true">
@@ -75,6 +76,9 @@
 
             <div class="modal-actions">
                 <button type="button" class="btn-secondary" @onclick="OnClose">Cancel</button>
+                <button type="button" class="btn-secondary" @onclick="ExportLocally" disabled="@IsSubmitting">
+                    Export Locally
+                </button>
                 <button type="submit" class="btn-primary" disabled="@IsSubmitting">
                     @if (IsSubmitting)
                     {
@@ -115,5 +119,110 @@
         {
             IsSubmitting = false;
         }
+    }
+
+    private async Task ExportLocally()
+    {
+        var quoteText = GenerateQuoteText();
+        var fileName = $"quote_{DateTime.Now:yyyyMMdd_HHmmss}.txt";
+
+        // Convert text to bytes and trigger download
+        var bytes = System.Text.Encoding.UTF8.GetBytes(quoteText);
+        var base64 = Convert.ToBase64String(bytes);
+
+        await JS.InvokeVoidAsync("eval", $@"
+            (function() {{
+                const link = document.createElement('a');
+                link.href = 'data:text/plain;base64,{base64}';
+                link.download = '{fileName}';
+                link.click();
+            }})();
+        ");
+    }
+
+    private string GenerateQuoteText()
+    {
+        var text = new System.Text.StringBuilder();
+
+        text.AppendLine("================================================================================");
+        text.AppendLine("                        CONVEYOR SYSTEM QUOTE REQUEST");
+        text.AppendLine("================================================================================");
+        text.AppendLine();
+        text.AppendLine($"Generated: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+        text.AppendLine();
+
+        text.AppendLine("CUSTOMER INFORMATION");
+        text.AppendLine("--------------------------------------------------------------------------------");
+        text.AppendLine($"Company:         {Quote.Company}");
+        text.AppendLine($"Contact:         {Quote.Contact}");
+        text.AppendLine($"Email:           {Quote.Email}");
+        if (!string.IsNullOrEmpty(Quote.Phone))
+            text.AppendLine($"Phone:           {Quote.Phone}");
+        text.AppendLine($"Systems Needed:  {Quote.Quantity}");
+        text.AppendLine();
+
+        if (!string.IsNullOrEmpty(Quote.Notes))
+        {
+            text.AppendLine("ADDITIONAL NOTES");
+            text.AppendLine("--------------------------------------------------------------------------------");
+            text.AppendLine(Quote.Notes);
+            text.AppendLine();
+        }
+
+        text.AppendLine("SYSTEM CONFIGURATION");
+        text.AppendLine("--------------------------------------------------------------------------------");
+        text.AppendLine($"Type:            {ConveyorType.ToUpper()}");
+
+        if (OverheadConfig != null)
+        {
+            text.AppendLine($"Track Length:    {OverheadConfig.TrackLength:N0} mm");
+            text.AppendLine($"Track Profile:   {OverheadConfig.TrackProfile}");
+            text.AppendLine($"Height:          {OverheadConfig.HeightFromFloor:N0} mm");
+            text.AppendLine($"Carriers:        {OverheadConfig.NumCarriers} units");
+            text.AppendLine($"Carrier Spacing: {OverheadConfig.CarrierSpacing:N0} mm");
+            text.AppendLine($"Load/Carrier:    {OverheadConfig.LoadPerCarrier:N0} kg");
+            text.AppendLine($"Total Capacity:  {OverheadConfig.NumCarriers * OverheadConfig.LoadPerCarrier:N0} kg");
+            text.AppendLine($"Drive Units:     {OverheadConfig.DriveUnits}");
+
+            if (OverheadConfig.IncludeCurves)
+            {
+                text.AppendLine($"Includes Curves: Yes");
+                text.AppendLine($"Curve Radius:    {OverheadConfig.CurveRadius:N0} mm");
+            }
+            else
+            {
+                text.AppendLine($"Includes Curves: No");
+            }
+
+            if (OverheadConfig.InclineAngle > 0)
+                text.AppendLine($"Incline Angle:   {OverheadConfig.InclineAngle}°");
+            if (OverheadConfig.DeclineAngle > 0)
+                text.AppendLine($"Decline Angle:   {OverheadConfig.DeclineAngle}°");
+        }
+        text.AppendLine();
+
+        if (BomItems != null && BomItems.Any())
+        {
+            text.AppendLine("BILL OF MATERIALS");
+            text.AppendLine("================================================================================");
+            text.AppendLine($"{"Part Number",-20} {"Description",-35} {"Qty",5} {"Price",12} {"Total",12}");
+            text.AppendLine("--------------------------------------------------------------------------------");
+
+            foreach (var item in BomItems.Where(i => i.Quantity > 0))
+            {
+                text.AppendLine($"{item.PartNumber,-20} {item.Description,-35} {item.Quantity,5} {item.UnitPrice,12:C} {item.TotalPrice,12:C}");
+            }
+
+            text.AppendLine("--------------------------------------------------------------------------------");
+            var total = BomItems.Sum(i => i.TotalPrice);
+            text.AppendLine($"{"ESTIMATED TOTAL",62} {total,12:C}");
+            text.AppendLine("================================================================================");
+        }
+
+        text.AppendLine();
+        text.AppendLine("Note: This is an estimate only. Final pricing subject to confirmation.");
+        text.AppendLine("Please contact us for detailed specifications and formal quotation.");
+
+        return text.ToString();
     }
 }

@@ -33,10 +33,6 @@ using (var scope = app.Services.CreateScope())
 
 app.UseCors();
 
-// Serve static files from wwwroot
-app.UseDefaultFiles();
-app.UseStaticFiles();
-
 // Store quotes in memory (use database in production)
 var quotes = new List<QuoteRequest>();
 
