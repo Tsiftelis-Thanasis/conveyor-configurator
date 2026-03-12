@@ -132,10 +132,24 @@ public class ConveyorApiService
         if (response.IsSuccessStatusCode)
             return await response.Content.ReadFromJsonAsync<CadImportResult>();
 
+        // Try to read the actual error message from the response body
+        string errorDetail;
+        try
+        {
+            var body = await response.Content.ReadAsStringAsync();
+            // Backend returns { "error": "..." } on BadRequest
+            var parsed = System.Text.Json.JsonDocument.Parse(body);
+            errorDetail = parsed.RootElement.TryGetProperty("error", out var e) ? e.GetString() ?? body : body;
+        }
+        catch
+        {
+            errorDetail = $"HTTP {(int)response.StatusCode} {response.StatusCode}";
+        }
+
         return new CadImportResult
         {
             Success = false,
-            Error = $"Server returned {response.StatusCode}"
+            Error = errorDetail
         };
     }
 }

@@ -3,7 +3,10 @@
     "allow": [
       "WebSearch",
       "Bash(dir:*)",
-      "Bash(dotnet build:*)"
+      "Bash(dotnet build:*)",
+      "Bash(dotnet list:*)",
+      "Bash(dotnet-ildasm:*)",
+      "Bash(powershell:*)"
     ]
   }
 }

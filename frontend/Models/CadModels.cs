@@ -16,6 +16,18 @@ public class CadImportResult
     public BoundingBox3D? BoundingBox { get; set; }
     public CadMeshData? MeshData { get; set; }
     public SuggestedConveyorConfig? SuggestedConfig { get; set; }
+    public Dictionary<string, int> EntityTypeCounts { get; set; } = new();
+    public List<TextItem> Texts { get; set; } = new();
+}
+
+public class TextItem
+{
+    public string Content  { get; set; } = "";
+    public Point3D Position { get; set; } = new();
+    public double Height   { get; set; }
+    public double Rotation { get; set; }
+    public string Layer    { get; set; } = "";
+    public string ItemType { get; set; } = "Text"; // "Text" | "MText" | "Dimension"
 }
 
 /// <summary>

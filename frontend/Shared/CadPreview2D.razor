@@ -2,7 +2,7 @@
 @inject IJSRuntime JS
 
 <div class="cad-preview-2d">
-    <canvas @ref="_canvasRef" width="800" height="600"></canvas>
+    <canvas @ref="_canvasRef" width="1100" height="750"></canvas>
 
     <div class="cad-stats">
         <h4>Track Statistics</h4>
@@ -22,23 +22,63 @@
             <span class="stat-label">Total Entities:</span>
             <span class="stat-value">@Result?.Entities.Count</span>
         </div>
+        @if (Result?.EntityTypeCounts?.Any() == true)
+        {
+            <div class="stat-row">
+                <span class="stat-label">By type:</span>
+                <span class="stat-value">@string.Join(", ", Result.EntityTypeCounts.Select(kv => $"{kv.Key}:{kv.Value}"))</span>
+            </div>
+        }
     </div>
 
     <div class="cad-legend">
-        <div class="legend-item">
-            <span class="legend-color" style="background: #4488ff;"></span>
-            <span>Straight Track</span>
-        </div>
-        <div class="legend-item">
-            <span class="legend-color" style="background: #ff4444;"></span>
-            <span>Curved Track</span>
-        </div>
+        <div class="legend-item"><span class="legend-color" style="background: #4499ff;"></span><span>Lines</span></div>
+        <div class="legend-item"><span class="legend-color" style="background: #ff6644;"></span><span>Arcs / Circles</span></div>
+        <div class="legend-item"><span class="legend-color" style="background: #ffcc44;"></span><span>Dimensions</span></div>
+        <div class="legend-item"><span class="legend-color" style="background: #cccccc;"></span><span>Text labels</span></div>
     </div>
+
+    @if (Dimensions.Any())
+    {
+        <div class="cad-dimensions">
+            <h4>Detected Dimensions</h4>
+            @foreach (var d in Dimensions)
+            {
+                <div class="stat-row">
+                    <span class="stat-label">@d.Layer</span>
+                    <span class="stat-value">@d.Content</span>
+                </div>
+            }
+        </div>
+    }
+
+    @if (Notes.Any())
+    {
+        <div class="cad-notes">
+            <h4>Drawing Notes &amp; Labels</h4>
+            @foreach (var note in Notes)
+            {
+                <div class="note-item">@note</div>
+            }
+        </div>
+    }
 </div>
 
 @code {
     [Parameter]
     public CadImportResult? Result { get; set; }
+
+    private IEnumerable<TextItem> Dimensions =>
+        Result?.Texts.Where(t => t.ItemType == "Dimension") ?? [];
+
+    // Labels and notes: non-dimension text with meaningful content
+    private IEnumerable<string> Notes =>
+        Result?.Texts
+            .Where(t => t.ItemType != "Dimension" && !string.IsNullOrWhiteSpace(t.Content) && t.Content.Length > 2)
+            .Select(t => t.Content)
+            .Distinct()
+            .OrderBy(s => s)
+        ?? Enumerable.Empty<string>();
 
     private ElementReference _canvasRef;
     private IJSObjectReference? _module;

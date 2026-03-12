@@ -116,12 +116,18 @@ app.MapPost("/api/import/cad", async (HttpRequest request) =>
         var service = new ConveyorApi.Services.CadImportService();
         var result = service.ImportFile(file.OpenReadStream(), file.FileName);
 
-        return result.Success
-            ? Results.Ok(result)
-            : Results.BadRequest(new { error = result.Error });
+        if (!result.Success)
+        {
+            Console.WriteLine($"[CAD Import] Parse failed: {result.Error}");
+            return Results.BadRequest(new { error = result.Error });
+        }
+
+        Console.WriteLine($"[CAD Import] OK: {result.Entities.Count} entities, {result.Texts.Count} texts");
+        return Results.Ok(result);
     }
     catch (Exception ex)
     {
+        Console.WriteLine($"[CAD Import] Exception: {ex}");
         return Results.Problem($"Error importing CAD file: {ex.Message}");
     }
 });
