@@ -1,15 +1,15 @@
 /* CSS Variables */
 :root {
-    --bg-dark: #1a1a2e;
-    --bg-panel: #16213e;
-    --bg-section: #0f3460;
-    --text-primary: #e8e8e8;
-    --text-secondary: #a0a0a0;
-    --accent: #e94560;
-    --highlight: #f6ad55;
-    --success: #48bb78;
-    --info: #4299e1;
-    --border-color: #2a2a4a;
+    --bg-dark: #ffffff;
+    --bg-panel: #f8f9fa;
+    --bg-section: #f0f2f5;
+    --text-primary: #1a1a2e;
+    --text-secondary: #6c757d;
+    --accent: #2563eb;
+    --highlight: #1e40af;
+    --success: #16a34a;
+    --info: #0284c7;
+    --border-color: #dee2e6;
 }
 
 /* Reset and Base */
@@ -40,6 +40,7 @@ html, body {
     min-width: 320px;
     background-color: var(--bg-panel);
     border-right: 1px solid var(--border-color);
+    box-shadow: 2px 0 8px rgba(0, 0, 0, 0.06);
     display: flex;
     flex-direction: column;
     overflow-y: auto;
@@ -191,7 +192,7 @@ html, body {
 }
 
 .btn-primary:hover {
-    background-color: #d93651;
+    background-color: #1d4ed8;
 }
 
 .btn-secondary {
@@ -213,13 +214,13 @@ html, body {
 }
 
 .status-message.success {
-    background-color: rgba(72, 187, 120, 0.2);
+    background-color: rgba(22, 163, 74, 0.1);
     color: var(--success);
     border: 1px solid var(--success);
 }
 
 .status-message.error {
-    background-color: rgba(233, 69, 96, 0.2);
+    background-color: rgba(37, 99, 235, 0.1);
     color: var(--accent);
     border: 1px solid var(--accent);
 }
@@ -238,8 +239,24 @@ html, body {
 }
 
 .three-container {
+    position: absolute;
+    inset: 0;
     width: 100%;
     height: 100%;
+}
+
+.hidden {
+    display: none !important;
+}
+
+/* Full-viewport 2D canvas */
+.cad-canvas-full {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+    background-color: #ffffff;
 }
 
 /* View Controls */
@@ -265,6 +282,18 @@ html, body {
 .view-controls button:hover {
     background-color: var(--bg-section);
     color: var(--text-primary);
+}
+
+.btn-back-drawing {
+    background-color: var(--accent) !important;
+    color: white !important;
+    border-color: var(--accent) !important;
+    font-weight: 600;
+}
+
+.btn-back-drawing:hover {
+    background-color: var(--highlight) !important;
+    border-color: var(--highlight) !important;
 }
 
 /* Modal */
@@ -725,7 +754,7 @@ form {
 
 .error-message {
     padding: 0.75rem;
-    background-color: rgba(233, 69, 96, 0.2);
+    background-color: rgba(37, 99, 235, 0.1);
     color: var(--accent);
     border: 1px solid var(--accent);
     border-radius: 4px;
@@ -866,6 +895,232 @@ form {
 .config-value {
     color: var(--text-primary);
     font-weight: 500;
+    font-size: 0.9rem;
+}
+
+/* CAD Upload Area (inline in sidebar Configure state) */
+.cad-upload-area {
+    padding: 1rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.cad-upload-area h3 {
+    font-size: 0.85rem;
+    color: var(--highlight);
+    margin: 0 0 0.25rem 0;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.upload-hint {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    margin: 0 0 0.75rem 0;
+}
+
+/* Action Buttons (CadActionPanel) */
+.btn-action {
+    display: block;
+    width: 100%;
+    padding: 0.875rem 1rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 600;
+    text-align: left;
+    transition: all 0.2s;
+    margin-bottom: 0.5rem;
+    border: none;
+}
+
+.btn-action-primary {
+    background-color: var(--accent);
+    color: white;
+}
+
+.btn-action-primary:hover {
+    background-color: #1d4ed8;
+}
+
+.btn-action-secondary {
+    background-color: var(--bg-section);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+}
+
+.btn-action-secondary:hover {
+    background-color: var(--border-color);
+}
+
+/* CadActionPanel */
+.cad-action-panel {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    overflow-y: auto;
+}
+
+.cad-file-info {
+    padding: 1rem;
+    border-bottom: 1px solid var(--border-color);
+    background-color: var(--bg-section);
+}
+
+.cad-file-info h3 {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0 0 0.25rem 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.cad-file-info p {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    margin: 0;
+}
+
+.cad-actions-section {
+    padding: 1rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.cad-dimensions-section {
+    padding: 1rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.cad-dimensions-section h4 {
+    font-size: 0.85rem;
+    color: var(--highlight);
+    margin: 0 0 0.5rem 0;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.cad-clear-link {
+    padding: 0.75rem 1rem;
+    text-align: center;
+}
+
+.cad-clear-link a {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    cursor: pointer;
+    text-decoration: underline;
+}
+
+.cad-clear-link a:hover {
+    color: var(--accent);
+}
+
+/* TrackSectionEditor */
+.track-section-editor {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    overflow-y: auto;
+}
+
+.track-editor-header {
+    padding: 1rem;
+    border-bottom: 1px solid var(--border-color);
+    background-color: var(--bg-section);
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.track-editor-header h3 {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.btn-back {
+    background: none;
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    padding: 0.25rem 0.6rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    transition: all 0.2s;
+}
+
+.btn-back:hover {
+    background-color: var(--bg-dark);
+    color: var(--text-primary);
+}
+
+.track-sections-list {
+    flex: 1;
+    padding: 0.5rem;
+    overflow-y: auto;
+}
+
+.track-section-item {
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
+    background-color: var(--bg-dark);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+}
+
+.track-section-item label {
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+    display: block;
+    margin-bottom: 0.25rem;
+}
+
+.track-section-item .section-header {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--highlight);
+    margin-bottom: 0.5rem;
+}
+
+.section-input-row {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-bottom: 0.4rem;
+}
+
+.section-input-row input[type="number"] {
+    flex: 1;
+    padding: 0.35rem 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background-color: var(--bg-panel);
+    color: var(--text-primary);
+    font-size: 0.85rem;
+}
+
+.section-input-row input[type="number"]:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+
+.section-unit {
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+
+.track-editor-footer {
+    padding: 1rem;
+    border-top: 1px solid var(--border-color);
+}
+
+.no-sections-msg {
+    padding: 2rem 1rem;
+    text-align: center;
+    color: var(--text-secondary);
     font-size: 0.9rem;
 }
 

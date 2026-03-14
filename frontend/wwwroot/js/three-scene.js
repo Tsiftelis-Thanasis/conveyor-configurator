@@ -17,7 +17,7 @@ export function initScene(containerId) {
 
     // Scene
     scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x1a1a2e);
+    scene.background = new THREE.Color(0xf0f2f5);
 
     // Camera
     const aspect = container.clientWidth / container.clientHeight;
@@ -49,7 +49,7 @@ export function initScene(containerId) {
     scene.add(directionalLight);
 
     // Grid
-    const gridHelper = new THREE.GridHelper(10, 20, 0x444444, 0x222222);
+    const gridHelper = new THREE.GridHelper(10, 20, 0xcccccc, 0xe0e0e0);
     scene.add(gridHelper);
 
     // Conveyor group

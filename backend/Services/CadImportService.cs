@@ -536,7 +536,62 @@ public class CadImportService
     // Track section identification
     // ──────────────────────────────────────────────────────────────────
 
-    private static TrackSection? IdentifyTrackSection(CadEntityInfo e)
+    // ──────────────────────────────────────────────────────────────────
+    // Public static BuildResult — shared with SketchRecognitionService
+    // ──────────────────────────────────────────────────────────────────
+
+    public static CadImportResult BuildResult(List<CadEntityInfo> entities, List<TextItem> texts, string fileName)
+    {
+        var ctx = new ParseContext();
+
+        foreach (var e in entities)
+        {
+            if (e.Type == "Line")       AddLineInfoToMesh(e, ctx);
+            else if (e.Type == "Arc" || e.Type == "Circle") AddArcInfoToMesh(e, ctx);
+        }
+
+        var result = new CadImportResult
+        {
+            Success  = true,
+            FileName = fileName,
+            Entities = entities,
+            Texts    = texts,
+            MeshData = new CadMeshData
+            {
+                Vertices = ctx.Vertices.ToArray(),
+                Indices  = ctx.Indices.ToArray()
+            }
+        };
+
+        foreach (var e in entities)
+        {
+            result.EntityTypeCounts.TryGetValue(e.Type, out var c);
+            result.EntityTypeCounts[e.Type] = c + 1;
+        }
+        result.EntityTypeCounts["Text"] = texts.Count;
+
+        foreach (var e in entities)
+        {
+            var ts = IdentifyTrackSection(e);
+            if (ts != null) result.TrackSections.Add(ts);
+        }
+
+        result.TotalTrackLength = result.TrackSections.Where(t => t.Type == "Straight").Sum(t => t.Length);
+        result.TotalCurveLength = result.TrackSections.Where(t => t.Type == "Curve").Sum(t => t.Length);
+        result.CurveCount       = result.TrackSections.Count(t => t.Type == "Curve");
+
+        if (entities.Any())
+            result.BoundingBox = CalculateBoundingBox(entities);
+
+        result.SuggestedConfig = GenerateSuggestedConfig(result);
+        return result;
+    }
+
+    // ──────────────────────────────────────────────────────────────────
+    // Track section identification
+    // ──────────────────────────────────────────────────────────────────
+
+    public static TrackSection? IdentifyTrackSection(CadEntityInfo e)
     {
         if (e.Type == "Line" && e.Length > 100)
             return new TrackSection { Type = "Straight", Length = e.Length, StartPoint = e.StartPoint, EndPoint = e.EndPoint };
@@ -561,7 +616,7 @@ public class CadImportService
     // Bounding box
     // ──────────────────────────────────────────────────────────────────
 
-    private static BoundingBox3D CalculateBoundingBox(List<CadEntityInfo> entities)
+    public static BoundingBox3D CalculateBoundingBox(List<CadEntityInfo> entities)
     {
         double minX = double.MaxValue, minY = double.MaxValue, minZ = double.MaxValue;
         double maxX = double.MinValue, maxY = double.MinValue, maxZ = double.MinValue;
@@ -601,7 +656,7 @@ public class CadImportService
     // Suggested config
     // ──────────────────────────────────────────────────────────────────
 
-    private static SuggestedConveyorConfig GenerateSuggestedConfig(CadImportResult r)
+    public static SuggestedConveyorConfig GenerateSuggestedConfig(CadImportResult r)
     {
         var cfg = new SuggestedConveyorConfig
         {

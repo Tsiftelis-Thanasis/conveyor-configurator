@@ -1,14 +1,21 @@
 // 2D CAD Preview Renderer
+export function resizeCadCanvas(canvas) {
+    const parent = canvas.parentElement;
+    if (!parent) return;
+    canvas.width  = parent.clientWidth  || 1100;
+    canvas.height = parent.clientHeight || 750;
+}
+
 export function renderCadPreview(canvas, result) {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = '#1a1a1a';
+    ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     if (!result || !result.entities || result.entities.length === 0) {
-        ctx.fillStyle = '#666';
+        ctx.fillStyle = '#999';
         ctx.font = '16px Arial';
         ctx.textAlign = 'center';
         ctx.fillText('No entities to display', canvas.width / 2, canvas.height / 2);
@@ -48,7 +55,7 @@ export function renderCadPreview(canvas, result) {
     }
 
     // ── Grid ──────────────────────────────────────────────────────────
-    ctx.strokeStyle = '#2a2a2a';
+    ctx.strokeStyle = '#e8e8e8';
     ctx.lineWidth = 0.5;
     const gridSize = pickGridSize(bounds.width);
     for (let gx = Math.floor(bounds.min.x / gridSize) * gridSize; gx <= bounds.max.x; gx += gridSize) {
@@ -143,12 +150,12 @@ export function renderCadPreview(canvas, result) {
 
             // Colour by type
             if (item.itemType === 'Dimension') {
-                ctx.fillStyle = '#ffcc44';
+                ctx.fillStyle = '#b45309';
             } else if ((item.layer || '').toLowerCase().includes('note') ||
                        (item.layer || '').toLowerCase().includes('text')) {
-                ctx.fillStyle = '#88ddaa';
+                ctx.fillStyle = '#15803d';
             } else {
-                ctx.fillStyle = '#cccccc';
+                ctx.fillStyle = '#4b5563';
             }
 
             // Handle multi-line MText

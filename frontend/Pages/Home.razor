@@ -2,6 +2,7 @@
 @using frontend.Models
 @using frontend.Services
 @using frontend.Shared
+@using Microsoft.AspNetCore.Components.Forms
 @inject ThreeJsInterop ThreeJs
 @inject ConveyorApiService Api
 @inject IJSRuntime JS
@@ -16,15 +17,41 @@
             <p class="panel-subtitle">Configure your NIKO enclosed track system</p>
         </header>
 
-        <OverheadControls Config="OverheadConfig"
-                          ProfileSeries="ProfileSeriesList"
-                          OnConfigChanged="OnOverheadConfigChanged" />
-
-        <section class="actions">
-            <button class="btn-primary" @onclick="GenerateBom">Generate Parts List</button>
-            <button class="btn-secondary" @onclick="ExportStep">Export STEP</button>
-            <button class="btn-secondary" @onclick="ShowCadImport">Import CAD Drawing</button>
-        </section>
+        @if (CurrentState == AppState.Upload)
+        {
+            <div class="cad-upload-area">
+                <h3>Import Drawing</h3>
+                <p class="upload-hint">Upload a DWG/DXF file or a photo of a hand-drawn sketch</p>
+                <InputFile OnChange="HandleFileSelected" accept=".dwg,.dxf,.jpg,.jpeg,.png,.bmp" class="file-input" />
+                @if (IsUploading)
+                {
+                    <div class="uploading">
+                        <div class="spinner"></div>
+                        <span>@UploadingMessage</span>
+                    </div>
+                }
+                @if (!string.IsNullOrEmpty(ImportError))
+                {
+                    <div class="error-message">@ImportError</div>
+                }
+            </div>
+        }
+        else if (CurrentState == AppState.CadLoaded)
+        {
+            <CadActionPanel Result="ImportResult!"
+                            Is3DActive="Show3DView"
+                            OnGenerateParts="GenerateBomFromImport"
+                            OnBuild3D="Build3DFromCad"
+                            OnBackToDrawing="BackToDrawing"
+                            OnAdjustDesign="StartAdjustDesign"
+                            OnClearDrawing="ClearDrawing" />
+        }
+        else if (CurrentState == AppState.AdjustDesign)
+        {
+            <TrackSectionEditor Sections="ImportResult!.TrackSections"
+                                OnBack="BackToCadLoaded"
+                                OnApplyChanges="ApplyTrackChanges" />
+        }
 
         @if (!string.IsNullOrEmpty(StatusMessage))
         {
@@ -33,14 +60,28 @@
     </aside>
 
     <main class="viewport">
-        <div id="three-container" class="three-container"></div>
-        <div class="view-controls">
-            <button @onclick="SetViewIso" title="Isometric View">ISO</button>
-            <button @onclick="SetViewTop" title="Top View">TOP</button>
-            <button @onclick="SetViewFront" title="Front View">FRONT</button>
-            <button @onclick="SetViewSide" title="Side View">SIDE</button>
-            <button @onclick="ResetCamera" title="Reset Camera">RESET</button>
-        </div>
+        <!-- Three.js container stays in DOM; hidden when showing 2D preview -->
+        <div id="three-container" class="three-container @(Show3DView ? "" : "hidden")"></div>
+
+        @if (Show3DView)
+        {
+            <div class="view-controls">
+                <button @onclick="SetViewIso" title="Isometric View">ISO</button>
+                <button @onclick="SetViewTop" title="Top View">TOP</button>
+                <button @onclick="SetViewFront" title="Front View">FRONT</button>
+                <button @onclick="SetViewSide" title="Side View">SIDE</button>
+                <button @onclick="ResetCamera" title="Reset Camera">RESET</button>
+                @if (ImportResult != null)
+                {
+                    <button class="btn-back-drawing" @onclick="BackToDrawing" title="Back to 2D Drawing">2D VIEW</button>
+                }
+            </div>
+        }
+
+        @if (ImportResult != null && !Show3DView)
+        {
+            <CadPreview2D Result="ImportResult" FullViewport="true" />
+        }
     </main>
 </div>
 
@@ -64,15 +105,20 @@
                 OnSubmit="SubmitQuote" />
 }
 
-@if (ShowCadImportModal)
-{
-    <CadImportModal OnClose="CloseCadImport"
-                    OnApplyConfig="ApplyCadConfiguration" />
-}
-
 @code {
+    private enum AppState { Upload, CadLoaded, AdjustDesign }
+
+    private AppState CurrentState { get; set; } = AppState.Upload;
+
     private OverheadConveyorConfig OverheadConfig { get; set; } = new();
     private List<ProfileSeries> ProfileSeriesList { get; set; } = new();
+
+    // CAD import state
+    private CadImportResult? ImportResult { get; set; }
+    private bool IsUploading { get; set; }
+    private string? ImportError { get; set; }
+    private bool Show3DView { get; set; }
+    private string UploadingMessage { get; set; } = "Uploading and analyzing...";
 
     // BOM-related state
     private bool ShowBomPanel { get; set; }
@@ -82,7 +128,6 @@
     private List<Bracket> AvailableBrackets { get; set; } = new();
 
     private bool ShowQuoteModal { get; set; }
-    private bool ShowCadImportModal { get; set; }
     private string? StatusMessage { get; set; }
     private string StatusClass { get; set; } = "";
 
@@ -94,7 +139,6 @@
         {
             _initialized = true;
             await ThreeJs.InitializeSceneAsync("three-container");
-            await BuildConveyor();
 
             try
             {
@@ -112,43 +156,156 @@
         }
     }
 
-    private async Task OnOverheadConfigChanged()
+    // ── File upload ────────────────────────────────────────────────────
+    private static readonly HashSet<string> ImageExtensions = [".jpg", ".jpeg", ".png", ".bmp"];
+
+    private async Task HandleFileSelected(InputFileChangeEventArgs e)
     {
-        await BuildConveyor();
+        var file = e.File;
+        if (file == null) return;
+
+        ImportError = null;
+        IsUploading = true;
+
+        var extension = Path.GetExtension(file.Name).ToLowerInvariant();
+        var isSketch = ImageExtensions.Contains(extension);
+        UploadingMessage = isSketch ? "Analyzing sketch with AI..." : "Analyzing CAD file...";
+
+        StateHasChanged();
+
+        try
+        {
+            using var stream = file.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024);
+
+            CadImportResult? result;
+            if (isSketch)
+                result = await Api.ImportSketchAsync(stream, file.Name);
+            else
+                result = await Api.ImportCadFileAsync(stream, file.Name);
+
+            if (result?.Success == true)
+            {
+                ImportResult = result;
+                Show3DView = false;
+                CurrentState = AppState.CadLoaded;
+            }
+            else
+            {
+                ImportError = result?.Error ?? "Failed to import file";
+            }
+        }
+        catch (Exception ex)
+        {
+            ImportError = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            IsUploading = false;
+            StateHasChanged();
+        }
     }
 
-    private async Task BuildConveyor()
+    // ── CadLoaded actions ──────────────────────────────────────────────
+    private async Task GenerateBomFromImport()
     {
-        if (!_initialized) return;
-        await ThreeJs.BuildOverheadConveyorAsync(OverheadConfig);
+        if (ImportResult?.SuggestedConfig != null)
+        {
+            ApplySuggestedConfig(ImportResult.SuggestedConfig);
+        }
+        await GenerateBom();
     }
 
-    private async Task SetViewIso() => await ThreeJs.SetViewAsync("iso");
-    private async Task SetViewTop() => await ThreeJs.SetViewAsync("top");
+    private async Task Build3DFromCad()
+    {
+        if (ImportResult?.MeshData == null) return;
+
+        try
+        {
+            Show3DView = true;
+            StateHasChanged();
+            // Give DOM time to make the three-container visible before resizing
+            await Task.Delay(50);
+            await ThreeJs.ResizeAsync();
+            await ThreeJs.LoadCadMeshAsync(ImportResult.MeshData);
+        }
+        catch (Exception ex)
+        {
+            Show3DView = false;
+            ShowStatus($"Error generating 3D model: {ex.Message}", "error");
+        }
+    }
+
+    private void BackToDrawing()
+    {
+        Show3DView = false;
+    }
+
+    private void StartAdjustDesign()
+    {
+        CurrentState = AppState.AdjustDesign;
+    }
+
+    private void BackToCadLoaded()
+    {
+        CurrentState = AppState.CadLoaded;
+    }
+
+    private void ApplyTrackChanges(List<TrackSection> updatedSections)
+    {
+        if (ImportResult == null) return;
+
+        ImportResult.TrackSections = updatedSections;
+        ImportResult.TotalTrackLength = updatedSections
+            .Where(s => s.Type == "Straight")
+            .Sum(s => s.Length);
+        ImportResult.TotalCurveLength = updatedSections
+            .Where(s => s.Type == "Curve")
+            .Sum(s => s.Length);
+        ImportResult.CurveCount = updatedSections.Count(s => s.Type == "Curve");
+
+        if (ImportResult.SuggestedConfig != null)
+        {
+            ImportResult.SuggestedConfig.TrackLength = ImportResult.TotalTrackLength;
+            ImportResult.SuggestedConfig.IncludeCurves = ImportResult.CurveCount > 0;
+            ImportResult.SuggestedConfig.CurveCount = ImportResult.CurveCount;
+            var avgRadius = updatedSections
+                .Where(s => s.Type == "Curve" && s.Radius.HasValue)
+                .Select(s => s.Radius!.Value)
+                .DefaultIfEmpty(0)
+                .Average();
+            ImportResult.SuggestedConfig.CurveRadius = avgRadius;
+        }
+
+        CurrentState = AppState.CadLoaded;
+    }
+
+    private void ClearDrawing()
+    {
+        ImportResult = null;
+        Show3DView = false;
+        ImportError = null;
+        CurrentState = AppState.Upload;
+    }
+
+    // ── Camera / view ──────────────────────────────────────────────────
+    private async Task SetViewIso()   => await ThreeJs.SetViewAsync("iso");
+    private async Task SetViewTop()   => await ThreeJs.SetViewAsync("top");
     private async Task SetViewFront() => await ThreeJs.SetViewAsync("front");
-    private async Task SetViewSide() => await ThreeJs.SetViewAsync("side");
+    private async Task SetViewSide()  => await ThreeJs.SetViewAsync("side");
+    private async Task ResetCamera()  => await ThreeJs.ResetCameraAsync();
 
-    private async Task ResetCamera()
-    {
-        await ThreeJs.ResetCameraAsync();
-    }
-
+    // ── BOM ────────────────────────────────────────────────────────────
     private async Task GenerateBom()
     {
         try
         {
             ShowStatus("Generating parts list...", "info");
-
-            // Load available parts for the selected series
             var series = OverheadConfig.TrackProfile;
-            AvailableTrolleys = await Api.GetTrolleysAsync("NIKO", series);
-            AvailableBends = await Api.GetTrackBendsAsync("NIKO", series);
-            AvailableBrackets = await Api.GetBracketsAsync("NIKO", series);
-
-            // Generate BOM based on configuration
-            GeneratedBom = GenerateBomFromConfig();
-
-            ShowBomPanel = true;
+            AvailableTrolleys  = await Api.GetTrolleysAsync("NIKO", series);
+            AvailableBends     = await Api.GetTrackBendsAsync("NIKO", series);
+            AvailableBrackets  = await Api.GetBracketsAsync("NIKO", series);
+            GeneratedBom       = GenerateBomFromConfig();
+            ShowBomPanel       = true;
             ShowStatus("Parts list generated!", "success");
         }
         catch (Exception ex)
@@ -162,23 +319,19 @@
         var bom = new List<BomItem>();
         var config = OverheadConfig;
 
-        // 1. Track Profile - straight sections (assuming 6m standard lengths)
         var trackLengthM = config.TrackLength / 1000.0;
-        var standardTrackLength = 6.0; // 6 meter sections
-        var trackSections = (int)Math.Ceiling(trackLengthM / standardTrackLength);
-
+        var trackSections = (int)Math.Ceiling(trackLengthM / 6.0);
         var selectedSeries = ProfileSeriesList.FirstOrDefault(s => s.SeriesCode == config.TrackProfile);
         bom.Add(new BomItem
         {
-            Category = "Track Profile",
-            PartNumber = $"TRACK-{config.TrackProfile}",
+            Category    = "Track Profile",
+            PartNumber  = $"TRACK-{config.TrackProfile}",
             Description = $"Enclosed Track Profile {config.TrackProfile} ({selectedSeries?.HeightMm}x{selectedSeries?.WidthMm}mm) - 6m section",
-            Quantity = trackSections,
-            UnitPrice = 250.00, // Placeholder price
-            CanSwap = false
+            Quantity    = trackSections,
+            UnitPrice   = 250.00,
+            CanSwap     = false
         });
 
-        // 2. Trolleys - based on carrier count and load requirements
         var requiredSwl = (int)Math.Ceiling(config.LoadPerCarrier);
         var selectedTrolley = AvailableTrolleys
             .Where(t => t.SafeWorkingLoadKg >= requiredSwl)
@@ -189,131 +342,111 @@
         {
             bom.Add(new BomItem
             {
-                Category = "Trolleys",
-                PartNumber = selectedTrolley.PartNumber,
+                Category    = "Trolleys",
+                PartNumber  = selectedTrolley.PartNumber,
                 Description = $"{selectedTrolley.TrolleyType} Trolley - {selectedTrolley.SafeWorkingLoadKg}kg SWL",
-                Quantity = config.NumCarriers,
-                UnitPrice = selectedTrolley.Price ?? 85.00,
-                CanSwap = true,
+                Quantity    = config.NumCarriers,
+                UnitPrice   = selectedTrolley.Price ?? 85.00,
+                CanSwap     = true,
                 AlternativePartNumbers = AvailableTrolleys
                     .Where(t => t.SafeWorkingLoadKg >= requiredSwl && t.PartNumber != selectedTrolley.PartNumber)
-                    .Select(t => t.PartNumber)
-                    .ToList()
+                    .Select(t => t.PartNumber).ToList()
             });
         }
 
-        // 3. Track Bends - if curves are included
         if (config.IncludeCurves)
         {
-            // Find bends close to the specified radius
             var selectedBend = AvailableBends
                 .OrderBy(b => Math.Abs(b.RadiusMm - config.CurveRadius))
                 .FirstOrDefault();
 
             if (selectedBend != null)
             {
-                // Assume 2 bends for a simple curved layout (90° turns)
                 bom.Add(new BomItem
                 {
-                    Category = "Track Bends",
-                    PartNumber = selectedBend.PartNumber,
+                    Category    = "Track Bends",
+                    PartNumber  = selectedBend.PartNumber,
                     Description = $"{selectedBend.AngleDegrees}° Bend - R{selectedBend.RadiusMm}mm",
-                    Quantity = 2,
-                    UnitPrice = selectedBend.Price ?? 180.00,
-                    CanSwap = true,
+                    Quantity    = 2,
+                    UnitPrice   = selectedBend.Price ?? 180.00,
+                    CanSwap     = true,
                     AlternativePartNumbers = AvailableBends
                         .Where(b => b.PartNumber != selectedBend.PartNumber)
-                        .Select(b => b.PartNumber)
-                        .ToList()
+                        .Select(b => b.PartNumber).ToList()
                 });
             }
         }
 
-        // 4. Mounting Brackets - every 2 meters
-        var bracketSpacing = 2000.0; // 2 meters
-        var bracketCount = (int)Math.Ceiling(config.TrackLength / bracketSpacing) + 1;
-
+        var bracketCount = (int)Math.Ceiling(config.TrackLength / 2000.0) + 1;
         var selectedBracket = AvailableBrackets.FirstOrDefault();
         if (selectedBracket != null)
         {
             bom.Add(new BomItem
             {
-                Category = "Mounting Brackets",
-                PartNumber = selectedBracket.PartNumber,
+                Category    = "Mounting Brackets",
+                PartNumber  = selectedBracket.PartNumber,
                 Description = $"{selectedBracket.BracketType} Bracket",
-                Quantity = bracketCount,
-                UnitPrice = selectedBracket.Price ?? 45.00,
-                CanSwap = true,
+                Quantity    = bracketCount,
+                UnitPrice   = selectedBracket.Price ?? 45.00,
+                CanSwap     = true,
                 AlternativePartNumbers = AvailableBrackets
                     .Where(b => b.PartNumber != selectedBracket.PartNumber)
-                    .Select(b => b.PartNumber)
-                    .ToList()
+                    .Select(b => b.PartNumber).ToList()
             });
         }
 
-        // 5. End Stops - 2 per track (start and end)
         bom.Add(new BomItem
         {
-            Category = "End Stops",
-            PartNumber = $"STOP-{config.TrackProfile}",
+            Category    = "End Stops",
+            PartNumber  = $"STOP-{config.TrackProfile}",
             Description = "Track End Stop",
-            Quantity = 2,
-            UnitPrice = 35.00,
-            CanSwap = false
+            Quantity    = 2,
+            UnitPrice   = 35.00,
+            CanSwap     = false
         });
 
-        // 6. Drive Unit placeholder
         if (config.DriveUnits > 0)
         {
             bom.Add(new BomItem
             {
-                Category = "Drive Units",
-                PartNumber = $"DRIVE-{config.TrackProfile}",
+                Category    = "Drive Units",
+                PartNumber  = $"DRIVE-{config.TrackProfile}",
                 Description = "Motorized Drive Unit",
-                Quantity = config.DriveUnits,
-                UnitPrice = 1250.00,
-                CanSwap = false
+                Quantity    = config.DriveUnits,
+                UnitPrice   = 1250.00,
+                CanSwap     = false
             });
         }
 
         return bom;
     }
 
-    private void CloseBomPanel()
-    {
-        ShowBomPanel = false;
-    }
+    private void CloseBomPanel() => ShowBomPanel = false;
 
     private void OnBomItemChanged(BomItem item)
     {
-        // Update the item in the list
         var index = GeneratedBom.FindIndex(b => b.PartNumber == item.PartNumber);
-        if (index >= 0)
-        {
-            GeneratedBom[index] = item;
-        }
+        if (index >= 0) GeneratedBom[index] = item;
         StateHasChanged();
     }
 
     private void RequestQuoteWithBom()
     {
-        ShowBomPanel = false;
+        ShowBomPanel  = false;
         ShowQuoteModal = true;
     }
 
+    // ── Export ─────────────────────────────────────────────────────────
     private async Task ExportStep()
     {
         try
         {
             ShowStatus("Generating STEP file...", "info");
-
             var data = await Api.ExportOverheadStepAsync(OverheadConfig);
-            var fileName = "overhead-conveyor.step";
-
             if (data != null)
             {
                 var base64 = Convert.ToBase64String(data);
-                await JS.InvokeVoidAsync("downloadFile", fileName, base64);
+                await JS.InvokeVoidAsync("downloadFile", "overhead-conveyor.step", base64);
                 ShowStatus("STEP file exported successfully!", "success");
             }
             else
@@ -327,10 +460,8 @@
         }
     }
 
-    private void CloseQuoteModal()
-    {
-        ShowQuoteModal = false;
-    }
+    // ── Quote ──────────────────────────────────────────────────────────
+    private void CloseQuoteModal() => ShowQuoteModal = false;
 
     private async Task SubmitQuote(QuoteRequest quote)
     {
@@ -353,44 +484,27 @@
         }
     }
 
-    private void ShowCadImport()
+    // ── Helpers ────────────────────────────────────────────────────────
+    private void ApplySuggestedConfig(SuggestedConveyorConfig suggested)
     {
-        ShowCadImportModal = true;
-    }
-
-    private void CloseCadImport()
-    {
-        ShowCadImportModal = false;
-    }
-
-    private async Task ApplyCadConfiguration(SuggestedConveyorConfig suggested)
-    {
-        OverheadConfig.TrackLength = suggested.TrackLength;
+        OverheadConfig.TrackLength     = suggested.TrackLength;
         OverheadConfig.HeightFromFloor = suggested.HeightFromFloor;
-        OverheadConfig.NumCarriers = suggested.NumCarriers;
-        OverheadConfig.CarrierSpacing = suggested.CarrierSpacing;
-        OverheadConfig.IncludeCurves = suggested.IncludeCurves;
-        OverheadConfig.CurveRadius = suggested.CurveRadius;
+        OverheadConfig.NumCarriers     = suggested.NumCarriers;
+        OverheadConfig.CarrierSpacing  = suggested.CarrierSpacing;
+        OverheadConfig.IncludeCurves   = suggested.IncludeCurves;
+        OverheadConfig.CurveRadius     = suggested.CurveRadius;
 
-        // Update track profile if available
         if (!string.IsNullOrEmpty(suggested.SuggestedProfile))
         {
-            var matchingSeries = ProfileSeriesList.FirstOrDefault(s => s.SeriesCode == suggested.SuggestedProfile);
-            if (matchingSeries != null)
-            {
-                OverheadConfig.TrackProfile = suggested.SuggestedProfile;
-            }
+            var match = ProfileSeriesList.FirstOrDefault(s => s.SeriesCode == suggested.SuggestedProfile);
+            if (match != null) OverheadConfig.TrackProfile = suggested.SuggestedProfile;
         }
-
-        ShowCadImportModal = false;
-        ShowStatus("Configuration applied from CAD import", "success");
-        await BuildConveyor();
     }
 
     private void ShowStatus(string message, string type)
     {
         StatusMessage = message;
-        StatusClass = type;
+        StatusClass   = type;
         StateHasChanged();
 
         _ = Task.Delay(3000).ContinueWith(_ =>

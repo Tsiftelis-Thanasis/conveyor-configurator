@@ -121,6 +121,34 @@ public class ConveyorApiService
         return null;
     }
 
+    // Import sketch image via Claude Vision
+    public async Task<CadImportResult?> ImportSketchAsync(Stream fileStream, string fileName)
+    {
+        using var content = new MultipartFormDataContent();
+        using var streamContent = new StreamContent(fileStream);
+        content.Add(streamContent, "file", fileName);
+
+        var response = await _http.PostAsync("/api/import/sketch", content);
+        if (response.IsSuccessStatusCode)
+            return await response.Content.ReadFromJsonAsync<CadImportResult>();
+
+        string errorDetail;
+        try
+        {
+            var body = await response.Content.ReadAsStringAsync();
+            var parsed = System.Text.Json.JsonDocument.Parse(body);
+            errorDetail = parsed.RootElement.TryGetProperty("detail", out var d) ? d.GetString() ?? body
+                        : parsed.RootElement.TryGetProperty("error", out var e)  ? e.GetString() ?? body
+                        : body;
+        }
+        catch
+        {
+            errorDetail = $"HTTP {(int)response.StatusCode} {response.StatusCode}";
+        }
+
+        return new CadImportResult { Success = false, Error = errorDetail };
+    }
+
     // Import CAD file (DWG/DXF)
     public async Task<CadImportResult?> ImportCadFileAsync(Stream fileStream, string fileName)
     {

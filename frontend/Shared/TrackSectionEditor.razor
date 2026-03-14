@@ -1,0 +1,124 @@
+@using frontend.Models
+
+<div class="track-section-editor">
+    <div class="track-editor-header">
+        <button class="btn-back" @onclick="() => OnBack.InvokeAsync()">&larr; Back</button>
+        <h3>Adjust Design</h3>
+    </div>
+
+    @if (_editableSections.Any())
+    {
+        <div class="track-sections-list">
+            @for (int i = 0; i < _editableSections.Count; i++)
+            {
+                var ts = _editableSections[i];
+                var idx = i;
+
+                <div class="track-section-item">
+                    <div class="section-header">
+                        @(ts.Type == "Curve" ? "Curve" : "Straight") #@(idx + 1)
+                    </div>
+
+                    @if (ts.Type == "Straight")
+                    {
+                        <label>Length</label>
+                        <div class="section-input-row">
+                            <input type="number" min="0" step="10"
+                                   value="@ts.Length"
+                                   @onchange="e => UpdateLength(idx, e.Value)" />
+                            <span class="section-unit">mm</span>
+                        </div>
+                    }
+                    else if (ts.Type == "Curve")
+                    {
+                        <label>Radius</label>
+                        <div class="section-input-row">
+                            <input type="number" min="0" step="50"
+                                   value="@(ts.Radius ?? 0)"
+                                   @onchange="e => UpdateRadius(idx, e.Value)" />
+                            <span class="section-unit">mm</span>
+                        </div>
+                        <label>Angle</label>
+                        <div class="section-input-row">
+                            <input type="number" min="0" max="360" step="1"
+                                   value="@(ts.Angle ?? 0)"
+                                   @onchange="e => UpdateAngle(idx, e.Value)" />
+                            <span class="section-unit">deg</span>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+
+        <div class="track-editor-footer">
+            <button class="btn-primary" style="width:100%;" @onclick="ApplyChanges">
+                Apply Changes
+            </button>
+        </div>
+    }
+    else
+    {
+        <div class="no-sections-msg">
+            No track sections detected in this drawing.
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public List<TrackSection> Sections { get; set; } = default!;
+
+    [Parameter]
+    public EventCallback OnBack { get; set; }
+
+    [Parameter]
+    public EventCallback<List<TrackSection>> OnApplyChanges { get; set; }
+
+    private List<TrackSection> _editableSections = new();
+
+    protected override void OnParametersSet()
+    {
+        _editableSections = Sections.Select(s => new TrackSection
+        {
+            Type       = s.Type,
+            Length     = s.Length,
+            Radius     = s.Radius,
+            Angle      = s.Angle,
+            StartPoint = s.StartPoint,
+            EndPoint   = s.EndPoint,
+            Center     = s.Center,
+            Points     = s.Points
+        }).ToList();
+    }
+
+    private void UpdateLength(int idx, object? value)
+    {
+        if (double.TryParse(value?.ToString(), out var d))
+            _editableSections[idx].Length = Math.Max(0, d);
+    }
+
+    private void UpdateRadius(int idx, object? value)
+    {
+        if (double.TryParse(value?.ToString(), out var d))
+        {
+            _editableSections[idx].Radius = Math.Max(0, d);
+            var angle = _editableSections[idx].Angle ?? 90;
+            _editableSections[idx].Length = Math.Max(0, d) * (angle * Math.PI / 180.0);
+        }
+    }
+
+    private void UpdateAngle(int idx, object? value)
+    {
+        if (double.TryParse(value?.ToString(), out var d))
+        {
+            _editableSections[idx].Angle = Math.Clamp(d, 0, 360);
+            var radius = _editableSections[idx].Radius ?? 0;
+            _editableSections[idx].Length = radius * (d * Math.PI / 180.0);
+        }
+    }
+
+    private async Task ApplyChanges()
+    {
+        await OnApplyChanges.InvokeAsync(_editableSections);
+    }
+}

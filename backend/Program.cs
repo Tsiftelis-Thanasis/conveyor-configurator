@@ -6,6 +6,17 @@ using ConveyorApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Read Anthropic API key (appsettings or environment variable)
+var anthropicKey = builder.Configuration["Anthropic:ApiKey"]
+    ?? Environment.GetEnvironmentVariable("ANTHROPIC_API_KEY")
+    ?? "";
+
+// Increase max request body size for CAD file uploads (default is 30MB, keep generous)
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.Limits.MaxRequestBodySize = 50 * 1024 * 1024; // 50 MB
+});
+
 // Add Entity Framework with SQLite
 builder.Services.AddDbContext<ProductDbContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("NikoProducts")));
@@ -129,6 +140,39 @@ app.MapPost("/api/import/cad", async (HttpRequest request) =>
     {
         Console.WriteLine($"[CAD Import] Exception: {ex}");
         return Results.Problem($"Error importing CAD file: {ex.Message}");
+    }
+});
+
+// Parse uploaded sketch image and return mesh data via Claude Vision
+app.MapPost("/api/import/sketch", async (HttpRequest request) =>
+{
+    if (string.IsNullOrEmpty(anthropicKey))
+        return Results.Problem("Sketch recognition not configured — set Anthropic:ApiKey or ANTHROPIC_API_KEY", statusCode: 503);
+
+    if (!request.HasFormContentType)
+        return Results.BadRequest("Expected form data");
+
+    var form = await request.ReadFormAsync();
+    var file = form.Files.FirstOrDefault();
+
+    if (file == null)
+        return Results.BadRequest("No file uploaded");
+
+    var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
+    if (ext != ".jpg" && ext != ".jpeg" && ext != ".png" && ext != ".bmp")
+        return Results.BadRequest("Unsupported image format. Please upload JPG, PNG, or BMP.");
+
+    try
+    {
+        var service = new ConveyorApi.Services.SketchRecognitionService(anthropicKey);
+        var result  = await service.AnalyzeSketchAsync(file.OpenReadStream(), file.FileName);
+        Console.WriteLine($"[Sketch Import] OK: {result.Entities.Count} entities from {file.FileName}");
+        return Results.Ok(result);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"[Sketch Import] Exception: {ex}");
+        return Results.Problem($"Error analyzing sketch: {ex.Message}");
     }
 });
 

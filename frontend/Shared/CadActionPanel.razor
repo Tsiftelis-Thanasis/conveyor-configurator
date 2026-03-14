@@ -1,0 +1,94 @@
+@using frontend.Models
+
+<div class="cad-action-panel">
+    <div class="cad-file-info">
+        <h3>@Result.FileName</h3>
+        <p>@Result.Entities.Count entities detected</p>
+    </div>
+
+    <div class="cad-actions-section">
+        <button class="btn-action btn-action-primary" @onclick="() => OnGenerateParts.InvokeAsync()">
+            Generate Parts List
+        </button>
+        @if (Is3DActive)
+        {
+            <button class="btn-action btn-action-secondary" @onclick="() => OnBackToDrawing.InvokeAsync()">
+                View 2D Drawing
+            </button>
+        }
+        else
+        {
+            <button class="btn-action btn-action-secondary" @onclick="() => OnBuild3D.InvokeAsync()">
+                Build 3D Model
+            </button>
+        }
+        <button class="btn-action btn-action-secondary" @onclick="() => OnAdjustDesign.InvokeAsync()">
+            Adjust Design
+        </button>
+    </div>
+
+    <div class="cad-dimensions-section">
+        <h4>Track Statistics</h4>
+        <div class="stat-row">
+            <span class="stat-label">Straight Track:</span>
+            <span class="stat-value">@($"{Result.TotalTrackLength:F0} mm")</span>
+        </div>
+        <div class="stat-row">
+            <span class="stat-label">Curve Length:</span>
+            <span class="stat-value">@($"{Result.TotalCurveLength:F0} mm")</span>
+        </div>
+        <div class="stat-row">
+            <span class="stat-label">Curves:</span>
+            <span class="stat-value">@Result.CurveCount</span>
+        </div>
+        @if (Result.TrackSections.Any())
+        {
+            <div class="stat-row">
+                <span class="stat-label">Sections:</span>
+                <span class="stat-value">@Result.TrackSections.Count</span>
+            </div>
+        }
+
+        @if (Dimensions.Any())
+        {
+            <h4 style="margin-top:0.75rem;">Detected Dimensions</h4>
+            @foreach (var d in Dimensions)
+            {
+                <div class="stat-row">
+                    <span class="stat-label">@d.Layer</span>
+                    <span class="stat-value">@d.Content</span>
+                </div>
+            }
+        }
+    </div>
+
+    <div class="cad-clear-link">
+        <a @onclick="() => OnClearDrawing.InvokeAsync()" @onclick:preventDefault>Clear Drawing</a>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public CadImportResult Result { get; set; } = default!;
+
+    [Parameter]
+    public EventCallback OnGenerateParts { get; set; }
+
+    [Parameter]
+    public bool Is3DActive { get; set; }
+
+    [Parameter]
+    public EventCallback OnBuild3D { get; set; }
+
+    [Parameter]
+    public EventCallback OnBackToDrawing { get; set; }
+
+    [Parameter]
+    public EventCallback OnAdjustDesign { get; set; }
+
+    [Parameter]
+    public EventCallback OnClearDrawing { get; set; }
+
+    private IEnumerable<TextItem> Dimensions =>
+        Result.Texts.Where(t => t.ItemType == "Dimension");
+}
